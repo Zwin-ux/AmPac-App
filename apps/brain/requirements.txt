@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+python-dotenv
+firebase-admin
+openai
+langchain
+langchain-openai
+pydantic
+httpx
+azure-identity
+msgraph-core
+msgraph-sdk
