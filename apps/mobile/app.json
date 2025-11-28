@@ -7,6 +7,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "scheme": "ampac",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -25,6 +26,19 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-font"
+    ],
+    "extra": {
+      "graphClientId": "ENTER_GRAPH_CLIENT_ID",
+      "graphTenantId": "common",
+      "graphUseProxy": true,
+      "graphScopes": [
+        "Calendars.ReadWrite",
+        "offline_access"
+      ],
+      "scheme": "ampac"
     }
   }
 }

@@ -1,10 +1,9 @@
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
 import { Business } from '../types';
+import { cacheService } from './cache';
 
 let businessCache: Business[] | null = null;
-
-import { cacheService } from './cache';
 
 const CACHE_KEY_BUSINESSES = 'cache_businesses';
 
@@ -22,8 +21,9 @@ export const getBusinesses = async (forceRefresh = false): Promise<Business[]> =
     }
 
     try {
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('role', '==', 'entrepreneur'));
+        const businessesRef = collection(db, 'businesses');
+        // const q = query(usersRef, where('role', '==', 'entrepreneur')); // OLD: caused permission error
+        const q = query(businessesRef); // Query businesses directly
         const querySnapshot = await getDocs(q);
 
         const fetchedBusinesses: Business[] = [];

@@ -25,13 +25,11 @@ export default function HotlineScreen() {
             // In dev mode, we might not have a user, so handle gracefully
             const uid = auth.currentUser?.uid || 'dev-user';
 
-            await createHotlineRequest({
-                userId: uid,
+            await createHotlineRequest(
+                uid,
                 subject,
-                message,
-                status: 'pending',
-                createdAt: new Date().toISOString()
-            });
+                message
+            );
 
             Alert.alert('Success', 'Your request has been sent to AmPac support.');
             setSubject('');

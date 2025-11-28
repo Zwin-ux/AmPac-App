@@ -1,19 +1,19 @@
 export const theme = {
     colors: {
-        primary: '#005596', // AmPac Blue
-        secondary: '#7AB800', // AmPac Green
-        background: '#F5F7FA', // Light Grey/Blue background
+        background: '#FFFFFF', // Pure White
         surface: '#FFFFFF',
-        text: '#1A1A1A',
-        textSecondary: '#666666',
-        border: '#E0E0E0',
-        error: '#D32F2F',
-        success: '#388E3C',
-        warning: '#FBC02D',
-        info: '#0288D1',
-        // Glassmorphism
-        glass: 'rgba(255, 255, 255, 0.8)',
-        glassBorder: 'rgba(255, 255, 255, 0.5)',
+        surfaceHighlight: '#F4F4F5', // Zinc 100
+        text: '#09090B', // Zinc 950 (Almost Black)
+        textSecondary: '#71717A', // Zinc 500
+        primary: '#09090B', // Zinc 950
+        primaryLight: '#27272A', // Zinc 800
+        secondary: '#52525B', // Zinc 600
+        accent: '#00C853', // Sharp Green (Success/Action)
+        border: '#E4E4E7', // Zinc 200
+        error: '#EF4444', // Red 500
+        success: '#10B981', // Emerald 500
+        warning: '#F59E0B', // Amber 500
+        info: '#3B82F6', // Blue 500
     },
     spacing: {
         xs: 4,
@@ -25,56 +25,93 @@ export const theme = {
     },
     typography: {
         h1: {
-            fontSize: 32,
-            fontWeight: 'bold' as 'bold',
-            color: '#1A1A1A',
+            fontSize: 24,
+            fontWeight: '700',
+            color: '#09090B',
+            letterSpacing: -0.5,
+            lineHeight: 32,
         },
         h2: {
-            fontSize: 24,
-            fontWeight: 'bold' as 'bold',
-            color: '#1A1A1A',
+            fontSize: 20,
+            fontWeight: '600',
+            color: '#09090B',
+            letterSpacing: -0.3,
+            lineHeight: 28,
         },
         h3: {
-            fontSize: 20,
-            fontWeight: '600' as '600',
-            color: '#1A1A1A',
+            fontSize: 18,
+            fontWeight: '600',
+            color: '#09090B',
+            letterSpacing: -0.2,
+            lineHeight: 24,
         },
         body: {
-            fontSize: 16,
-            color: '#1A1A1A',
-            lineHeight: 24,
+            fontSize: 15, // Slightly smaller, denser
+            color: '#09090B',
+            lineHeight: 22,
+        },
+        label: {
+            fontSize: 13,
+            fontWeight: '500',
+            color: '#71717A',
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
         },
         caption: {
             fontSize: 12,
-            color: '#666666',
+            color: '#71717A',
+            lineHeight: 16,
         },
         button: {
-            fontSize: 16,
-            fontWeight: '600' as '600',
+            fontSize: 14,
+            fontWeight: '600',
             color: '#FFFFFF',
+            letterSpacing: 0.2,
         },
+        display: {
+            fontSize: 32,
+            fontWeight: '800',
+            color: '#09090B',
+            letterSpacing: -1,
+        }
     },
     borderRadius: {
-        sm: 4,
-        md: 8,
-        lg: 16,
-        xl: 24,
+        sm: 2,
+        md: 4, // Sharp, engineered look
+        lg: 8,
+        xl: 12,
         round: 9999,
     },
     shadows: {
         card: {
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 8,
-            elevation: 3,
+            // No shadow, just border for the "flat" look
+            shadowColor: 'transparent',
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0,
+            shadowRadius: 0,
+            elevation: 0,
+            borderWidth: 1,
+            borderColor: '#E4E4E7',
         },
         float: {
-            shadowColor: '#005596',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.2,
+            shadowColor: "#000",
+            shadowOffset: {
+                width: 0,
+                height: 4,
+            },
+            shadowOpacity: 0.1,
             shadowRadius: 12,
-            elevation: 6,
+            elevation: 5,
         },
-    },
-};
+        subtle: {
+            shadowColor: "#000",
+            shadowOffset: {
+                width: 0,
+                height: 1,
+            },
+            shadowOpacity: 0.05,
+            shadowRadius: 2,
+            elevation: 1,
+        }
+    }
+} as const;

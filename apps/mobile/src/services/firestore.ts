@@ -33,6 +33,16 @@ export const createUserDoc = async (user: User): Promise<void> => {
     }
 };
 
+export const updateUserDoc = async (uid: string, data: Partial<User>): Promise<void> => {
+    try {
+        const userDocRef = doc(db, 'users', uid);
+        await setDoc(userDocRef, data, { merge: true });
+    } catch (error) {
+        console.error("Error updating user doc:", error);
+        throw error;
+    }
+};
+
 export const createHotlineRequest = async (
     userId: string,
     topic: string,

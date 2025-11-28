@@ -78,6 +78,42 @@ export default function SignInScreen() {
                 >
                     <Text style={styles.linkText}>Create account</Text>
                 </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={styles.demoButton}
+                    onPress={async () => {
+                        setLoading(true);
+                        try {
+                            // OFFLINE DEMO MODE
+                            const { Timestamp } = await import('firebase/firestore');
+                            const { userStore } = await import('../services/userStore');
+
+                            const demoProfile = {
+                                uid: 'demo-user-123',
+                                role: 'entrepreneur',
+                                fullName: 'Alex Rivera',
+                                businessName: 'Rivera Innovations',
+                                phone: '909-555-0101',
+                                industry: 'Technology',
+                                city: 'Riverside',
+                                bio: 'Building the future of sustainable tech in the Inland Empire.',
+                                jobTitle: 'Founder & CEO',
+                                createdAt: Timestamp.now(),
+                            };
+
+                            // Bypass Firebase Auth completely
+                            userStore.setDemoUser(demoProfile as any);
+
+                        } catch (error: any) {
+                            Alert.alert('Demo Error', error.message);
+                        } finally {
+                            setLoading(false);
+                        }
+                    }}
+                    disabled={loading}
+                >
+                    <Text style={styles.demoButtonText}>⚡ Demo Mode (Bypass)</Text>
+                </TouchableOpacity>
             </View>
         </KeyboardAvoidingView>
     );
@@ -143,6 +179,20 @@ const styles = StyleSheet.create({
     linkText: {
         color: theme.colors.primary,
         fontSize: 16,
+        fontWeight: '600',
+    },
+    demoButton: {
+        marginTop: theme.spacing.xl,
+        padding: theme.spacing.sm,
+        alignItems: 'center',
+        backgroundColor: theme.colors.surfaceHighlight,
+        borderRadius: theme.borderRadius.md,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+    },
+    demoButtonText: {
+        color: theme.colors.textSecondary,
+        fontSize: 14,
         fontWeight: '600',
     },
 });

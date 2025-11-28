@@ -12,6 +12,7 @@ import {
 import { db } from '../../firebaseConfig';
 import { Application, ApplicationType } from '../types';
 import { cacheService } from './cache';
+import { syncService } from './sync';
 
 export const APPLICATION_CACHE_KEY_PREFIX = 'cache_application_';
 const buildCacheKey = (userId: string) => `${APPLICATION_CACHE_KEY_PREFIX}${userId}`;
@@ -25,6 +26,10 @@ export const cacheApplicationSnapshot = async (application: Application): Promis
 };
 
 export const getApplication = async (userId: string): Promise<Application | null> => {
+    if (!userId) {
+        console.warn("getApplication called with no userId");
+        return null;
+    }
     const cacheKey = buildCacheKey(userId);
 
     // 1. Try cache first
@@ -46,7 +51,7 @@ export const getApplication = async (userId: string): Promise<Application | null
 
         if (!snapshot.empty) {
             const doc = snapshot.docs[0];
-            const appData = { id: doc.id, ...doc.data() } as Application;
+            const appData = { id: doc.id, version: 1, ...doc.data() } as Application;
             // Update cache
             await cacheService.set(cacheKey, appData);
             return appData;
@@ -61,7 +66,11 @@ export const getApplication = async (userId: string): Promise<Application | null
 export const saveApplication = async (id: string, data: Partial<Application>): Promise<void> => {
     try {
         const appDoc = doc(db, 'applications', id);
-        const updatedData = { ...data, lastUpdated: Timestamp.now() };
+        const updatedData = {
+            ...data,
+            version: typeof data.version === 'number' ? data.version : 1,
+            lastUpdated: Timestamp.now()
+        };
 
         // 1. Update Firestore
         await setDoc(appDoc, updatedData, { merge: true });
@@ -95,7 +104,19 @@ export const saveApplication = async (id: string, data: Partial<Application>): P
 
     } catch (error) {
         console.error("Error saving application:", error);
-        throw error;
+        if (data.userId) {
+            await syncService.queueWrite({
+                collection: 'applications',
+                docId: id,
+                payload: {
+                    ...data,
+                    version: typeof data.version === 'number' ? data.version : 1,
+                    lastUpdated: Timestamp.now()
+                },
+                merge: true,
+            });
+        }
+        // Do not rethrow to allow offline-first flow to continue; queued writes will flush later.
     }
 };
 
@@ -112,6 +133,7 @@ export const createApplication = async (userId: string, type: ApplicationType): 
         loanAmount: 0,
         useOfFunds: '',
         data: {},
+        version: 1,
         createdAt: Timestamp.now(),
         lastUpdated: Timestamp.now(),
     };
@@ -126,7 +148,14 @@ export const createApplication = async (userId: string, type: ApplicationType): 
         return newApp;
     } catch (error) {
         console.error("Error creating application:", error);
-        throw error;
+        await syncService.queueWrite({
+            collection: 'applications',
+            docId: newApp.id,
+            payload: newApp,
+            merge: false,
+        });
+        // Return the local draft so UI can proceed offline; queued write will sync later.
+        return newApp;
     }
 };
 
@@ -153,4 +182,16 @@ export const getUserApplications = async (userId: string): Promise<Application[]
         console.error("Error fetching applications:", error);
         return [];
     }
+};
+
+export const flushPendingApplicationWrites = async (): Promise<void> => {
+    await syncService.flushQueue(async (job) => {
+        if (job.collection !== 'applications') return;
+        const appDoc = doc(db, job.collection, job.docId);
+        await setDoc(appDoc, job.payload, { merge: job.merge !== false });
+        if (job.payload.userId) {
+            const cacheKey = buildCacheKey(job.payload.userId);
+            await cacheService.set(cacheKey, job.payload as Application);
+        }
+    });
 };

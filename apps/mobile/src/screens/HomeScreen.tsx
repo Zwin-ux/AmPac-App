@@ -1,65 +1,41 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, Image } from 'react-native';
-import { auth } from '../../firebaseConfig';
-import { getCurrentUserDoc } from '../services/firestore';
-import { User } from '../types';
+import { Image, ScrollView, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { theme } from '../theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import AssistantBubble from '../components/AssistantBubble';
-import { Timestamp } from 'firebase/firestore';
+import OfflineBanner from '../components/OfflineBanner';
+import { userStore } from '../services/userStore';
+import { theme } from '../theme';
+import { User } from '../types';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
 
 export default function HomeScreen() {
-    const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [user, setUser] = useState<User | null>(() => userStore.getCachedUser());
     const navigation = useNavigation<any>();
 
     useEffect(() => {
-        const fetchUser = async () => {
-            try {
-                if (auth.currentUser) {
-                    const userData = await getCurrentUserDoc(auth.currentUser.uid);
-                    setUser(userData);
-                } else {
-                    // Mock user for dev mode
-                    setUser({
-                        uid: 'dev-user',
-                        role: 'entrepreneur',
-                        fullName: 'Test Entrepreneur',
-                        businessName: 'Dev Business Inc.',
-                        phone: '555-0123',
-                        createdAt: Timestamp.now()
-                    });
-                }
-            } catch (error) {
-                console.error("Error fetching user:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchUser();
-    }, []);
+        const unsubscribe = userStore.subscribe(setUser);
 
-    if (loading) {
-        return (
-            <View style={styles.centered}>
-                <ActivityIndicator size="large" color={theme.colors.primary} />
-            </View>
-        );
-    }
+        const hydrate = async () => {
+            await userStore.hydrateFromStorage();
+            userStore.syncWithServer();
+        };
+        hydrate();
+
+        return unsubscribe;
+    }, []);
 
     const userName = user?.fullName?.split(' ')[0] || 'Entrepreneur';
 
     return (
         <SafeAreaView style={styles.container}>
+            <OfflineBanner />
             <View style={styles.header}>
                 <View>
-                    <Image
-                        source={require('../../assets/ampac_logo.png')}
-                        style={styles.headerLogo}
-                        resizeMode="contain"
-                    />
-                    <Text style={styles.welcomeText}>Welcome back, {userName}!</Text>
+                    <Text style={styles.headerTitle}>AmPac</Text>
+                    <Text style={styles.welcomeText}>Good afternoon, {userName}</Text>
                 </View>
                 <TouchableOpacity style={styles.profileButton} onPress={() => navigation.navigate('Profile')}>
                     <Text style={styles.profileButtonText}>{userName.charAt(0)}</Text>
@@ -68,52 +44,65 @@ export default function HomeScreen() {
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 {user?.businessName && (
-                    <View style={styles.businessCard}>
-                        <Text style={styles.businessLabel}>Your Business</Text>
+                    <Card style={styles.businessCard}>
+                        <View style={styles.businessHeader}>
+                            <Text style={styles.businessLabel}>YOUR BUSINESS</Text>
+                            <Ionicons name="trending-up" size={20} color={theme.colors.accent} />
+                        </View>
                         <Text style={styles.businessName}>{user.businessName}</Text>
-                    </View>
+                        <View style={styles.businessStats}>
+                            <View>
+                                <Text style={styles.statLabel}>STATUS</Text>
+                                <Text style={styles.statValue}>Active</Text>
+                            </View>
+                            <View>
+                                <Text style={styles.statLabel}>MEMBER SINCE</Text>
+                                <Text style={styles.statValue}>2023</Text>
+                            </View>
+                        </View>
+                    </Card>
                 )}
 
                 <Text style={styles.sectionTitle}>Quick Actions</Text>
 
-                <TouchableOpacity
-                    style={styles.actionCard}
-                    onPress={() => navigation.navigate('Support')}
-                >
-                    <View style={styles.actionIconPlaceholder}>
-                        <Text style={{ fontSize: 24 }}>📞</Text>
-                    </View>
-                    <View style={styles.actionContent}>
-                        <Text style={styles.actionTitle}>Talk to AmPac</Text>
-                        <Text style={styles.actionDescription}>Get help with funding, mentorship, or business advice.</Text>
-                    </View>
-                </TouchableOpacity>
+                <View style={styles.quickActionsGrid}>
+                    <Card style={styles.actionCard}>
+                        <TouchableOpacity onPress={() => navigation.navigate('Support')} style={styles.actionTouch}>
+                            <View style={styles.iconContainer}>
+                                <Ionicons name="chatbox-ellipses" size={20} color={theme.colors.text} />
+                            </View>
+                            <View>
+                                <Text style={styles.actionTitle}>Support</Text>
+                                <Text style={styles.actionDescription}>Talk to an expert</Text>
+                            </View>
+                        </TouchableOpacity>
+                    </Card>
 
-                <TouchableOpacity
-                    style={[styles.actionCard, { marginTop: theme.spacing.md }]}
-                    onPress={() => navigation.navigate('Spaces')}
-                >
-                    <View style={[styles.actionIconPlaceholder, { backgroundColor: theme.colors.secondary }]}>
-                        <Text style={{ fontSize: 24 }}>🏢</Text>
-                    </View>
-                    <View style={styles.actionContent}>
-                        <Text style={styles.actionTitle}>Book a Space</Text>
-                        <Text style={styles.actionDescription}>Find a room for your next meeting.</Text>
-                    </View>
-                </TouchableOpacity>
+                    <Card style={styles.actionCard}>
+                        <TouchableOpacity onPress={() => navigation.navigate('Spaces')} style={styles.actionTouch}>
+                            <View style={styles.iconContainer}>
+                                <Ionicons name="calendar" size={20} color={theme.colors.text} />
+                            </View>
+                            <View>
+                                <Text style={styles.actionTitle}>Book Space</Text>
+                                <Text style={styles.actionDescription}>Reserve a room</Text>
+                            </View>
+                        </TouchableOpacity>
+                    </Card>
 
-                <TouchableOpacity
-                    style={[styles.actionCard, { marginTop: theme.spacing.md }]}
-                    onPress={() => navigation.navigate('Network')}
-                >
-                    <View style={[styles.actionIconPlaceholder, { backgroundColor: theme.colors.primary }]}>
-                        <Text style={{ fontSize: 24 }}>🌐</Text>
-                    </View>
-                    <View style={styles.actionContent}>
-                        <Text style={styles.actionTitle}>Entrepreneur Ecosystem</Text>
-                        <Text style={styles.actionDescription}>Connect with our support hub and partners.</Text>
-                    </View>
-                </TouchableOpacity>
+                    <Card style={styles.fullWidthCard}>
+                        <TouchableOpacity onPress={() => navigation.navigate('Network')} style={styles.rowAction}>
+                            <View style={styles.iconContainer}>
+                                <Ionicons name="people" size={20} color={theme.colors.text} />
+                            </View>
+                            <View style={styles.rowContent}>
+                                <Text style={styles.actionTitle}>Entrepreneur Ecosystem</Text>
+                                <Text style={styles.actionDescription}>Connect with the community</Text>
+                            </View>
+                            <Ionicons name="arrow-forward" size={20} color={theme.colors.textSecondary} />
+                        </TouchableOpacity>
+                    </Card>
+                </View>
             </ScrollView>
             <AssistantBubble context="home" />
         </SafeAreaView>
@@ -127,99 +116,165 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         padding: theme.spacing.lg,
-    },
-    centered: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: theme.colors.background,
+        paddingBottom: theme.spacing.xl * 2,
     },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: theme.spacing.lg,
-        paddingTop: theme.spacing.md,
-        paddingBottom: theme.spacing.lg,
-        backgroundColor: theme.colors.surface,
+        paddingVertical: theme.spacing.md,
         borderBottomWidth: 1,
         borderBottomColor: theme.colors.border,
+        backgroundColor: theme.colors.background,
     },
-    headerLogo: {
-        width: 120,
-        height: 40,
-        marginBottom: 4,
+    headerTitle: {
+        ...theme.typography.h3 as any, // Smaller, tighter
+        textTransform: 'uppercase',
+        letterSpacing: 1,
     },
     welcomeText: {
-        fontSize: 14,
-        color: theme.colors.textSecondary,
+        ...theme.typography.caption as any,
+        marginTop: 2,
     },
     profileButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: theme.colors.primary,
+        width: 32,
+        height: 32,
+        borderRadius: theme.borderRadius.sm, // Square-ish
+        backgroundColor: theme.colors.surfaceHighlight,
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    profileButtonText: {
-        color: '#fff',
-        fontWeight: 'bold',
-        fontSize: 18,
-    },
-    businessCard: {
-        backgroundColor: theme.colors.primary,
-        padding: theme.spacing.lg,
-        borderRadius: theme.borderRadius.lg,
-        marginBottom: theme.spacing.xl,
-        marginTop: theme.spacing.lg,
-        ...theme.shadows.card,
-    },
-    businessLabel: {
-        color: 'rgba(255, 255, 255, 0.8)',
-        fontSize: 14,
-        marginBottom: theme.spacing.xs,
-    },
-    businessName: {
-        color: '#fff',
-        fontSize: 24,
-        fontWeight: 'bold',
-    },
-    sectionTitle: {
-        ...theme.typography.h2,
-        marginBottom: theme.spacing.md,
-    },
-    actionCard: {
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.borderRadius.lg,
-        padding: theme.spacing.lg,
-        flexDirection: 'row',
-        alignItems: 'center',
-        ...theme.shadows.card,
         borderWidth: 1,
         borderColor: theme.colors.border,
     },
-    actionIconPlaceholder: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: '#e0f2f1',
-        marginRight: theme.spacing.md,
+    profileButtonText: {
+        ...theme.typography.label as any,
+        color: theme.colors.text,
+    },
+    businessCard: {
+        backgroundColor: theme.colors.primary,
+        borderWidth: 0,
+        marginBottom: theme.spacing.xl,
+        padding: theme.spacing.xl, // More breathing room
+        ...theme.shadows.float, // Floating effect
+    },
+    businessHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: theme.spacing.md,
+    },
+    businessLabel: {
+        ...theme.typography.label as any,
+        color: theme.colors.accent,
+        letterSpacing: 1,
+    },
+    businessName: {
+        ...theme.typography.display as any,
+        fontSize: 28,
+        color: '#FFFFFF',
+        marginBottom: theme.spacing.xl,
+    },
+    businessStats: {
+        flexDirection: 'row',
+        gap: theme.spacing.xxl,
+    },
+    statLabel: {
+        ...theme.typography.label as any,
+        color: 'rgba(255, 255, 255, 0.5)',
+        marginBottom: 4,
+    },
+    statValue: {
+        ...theme.typography.h3 as any,
+        color: '#FFFFFF',
+        fontSize: 18,
+    },
+    sectionTitle: {
+        ...theme.typography.label as any,
+        marginBottom: theme.spacing.md,
+        marginTop: theme.spacing.lg,
+    },
+    quickActionsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        gap: theme.spacing.md,
+    },
+    actionCard: {
+        width: '48%', // Fixed width for 2 columns
+        aspectRatio: 1.2, // Keep boxy shape for grid items
         justifyContent: 'center',
         alignItems: 'center',
+        backgroundColor: theme.colors.surface,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        borderRadius: theme.borderRadius.md,
     },
-    actionContent: {
-        flex: 1,
+    fullWidthCard: {
+        width: '100%', // Full width
+        aspectRatio: undefined, // Let content define height
+        marginTop: theme.spacing.sm,
+        backgroundColor: theme.colors.surface,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        borderRadius: theme.borderRadius.md,
+    },
+    actionIcon: {
+        marginBottom: theme.spacing.sm,
+    },
+    actionLabel: {
+        ...theme.typography.label as any,
+        textAlign: 'center',
+    },
+    dashboardCard: {
+        padding: theme.spacing.md,
+        marginBottom: theme.spacing.md,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        borderRadius: theme.borderRadius.md,
+        backgroundColor: theme.colors.surface,
+    },
+    metricValue: {
+        ...theme.typography.h1 as any,
+        marginTop: theme.spacing.xs,
+    },
+    metricLabel: {
+        ...theme.typography.caption as any,
+    },
+    fullWidth: {
+        // Deprecated, use fullWidthCard
+    },
+    actionTouch: {
+        padding: theme.spacing.lg,
+        width: '100%',
+        height: '100%',
+        justifyContent: 'space-between',
+    },
+    iconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: theme.borderRadius.md,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: theme.spacing.lg,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        backgroundColor: theme.colors.surfaceHighlight,
     },
     actionTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: theme.colors.text,
+        ...theme.typography.h3 as any,
         marginBottom: 4,
     },
     actionDescription: {
-        fontSize: 14,
-        color: theme.colors.textSecondary,
-        lineHeight: 20,
+        ...theme.typography.caption as any,
+    },
+    rowAction: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: theme.spacing.lg,
+    },
+    rowContent: {
+        flex: 1,
+        marginLeft: theme.spacing.md,
     },
 });

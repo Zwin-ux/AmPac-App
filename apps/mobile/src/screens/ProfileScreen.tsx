@@ -1,17 +1,21 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, Image } from 'react-native';
 import { auth } from '../../firebaseConfig';
 import { signOut } from 'firebase/auth';
 import { getCurrentUserDoc } from '../services/firestore';
 import { User } from '../types';
 import { theme } from '../theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { DataField } from '../components/ui/DataField';
 
 import { cacheService } from '../services/cache';
 
 const CACHE_KEY_PROFILE = 'cache_user_profile';
 
-export default function ProfileScreen() {
+export default function ProfileScreen({ navigation }: any) {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -26,8 +30,9 @@ export default function ProfileScreen() {
                     setLoading(false);
                 }
 
-                if (auth.currentUser) {
-                    const userData = await getCurrentUserDoc(auth.currentUser.uid);
+                const currentUser = auth.currentUser;
+                if (currentUser) {
+                    const userData = await getCurrentUserDoc(currentUser.uid);
                     setUser(userData);
                     await cacheService.set(CACHE_KEY_PROFILE, userData);
                 } else {
@@ -38,7 +43,7 @@ export default function ProfileScreen() {
                         fullName: 'Test Entrepreneur',
                         businessName: 'Dev Business Inc.',
                         role: 'entrepreneur',
-                        createdAt: '2023-01-01',
+                        createdAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
                         phone: '555-0123'
                     } as User;
                     setUser(mockUser);
@@ -72,48 +77,65 @@ export default function ProfileScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
+            <View style={styles.header}>
+                <Text style={styles.headerTitle}>PROFILE</Text>
+                <Button
+                    title="EDIT"
+                    variant="ghost"
+                    onPress={() => navigation.navigate('EditProfile')}
+                    textStyle={styles.editButtonText}
+                />
+            </View>
+
             <ScrollView contentContainerStyle={styles.scrollContent}>
-                <Text style={styles.title}>Profile</Text>
-
-                <View style={styles.card}>
-                    <View style={styles.headerRow}>
-                        <Text style={styles.sectionTitle}>Personal Info</Text>
-                        <TouchableOpacity onPress={() => alert('Edit Profile')}>
-                            <Text style={styles.editLink}>Edit</Text>
-                        </TouchableOpacity>
+                <View style={styles.profileHeader}>
+                    <View style={styles.avatarContainer}>
+                        <Text style={styles.avatarText}>{user?.fullName?.charAt(0) || '?'}</Text>
                     </View>
-
-                    <View style={styles.infoRow}>
-                        <Text style={styles.label}>Full Name</Text>
-                        <Text style={styles.value}>{user?.fullName || 'N/A'}</Text>
-                    </View>
-
-                    <View style={styles.divider} />
-
-                    <View style={styles.infoRow}>
-                        <Text style={styles.label}>Business Name</Text>
-                        <Text style={styles.value}>{user?.businessName || 'N/A'}</Text>
-                    </View>
-
-                    <View style={styles.divider} />
-
-                    <View style={styles.infoRow}>
-                        <Text style={styles.label}>Email</Text>
-                        <Text style={styles.value}>{auth.currentUser?.email || user?.email || 'N/A'}</Text>
-                    </View>
-
-                    <View style={styles.divider} />
-
-                    <View style={styles.infoRow}>
-                        <Text style={styles.label}>Phone</Text>
-                        <Text style={styles.value}>{user?.phone || 'N/A'}</Text>
+                    <View style={styles.headerInfo}>
+                        <Text style={styles.name}>{user?.fullName || 'N/A'}</Text>
+                        <Text style={styles.role}>{user?.jobTitle || 'Entrepreneur'}</Text>
+                        <Text style={styles.company}>{user?.businessName || 'N/A'}</Text>
                     </View>
                 </View>
 
-                <View style={styles.card}>
-                    <Text style={styles.sectionTitle}>Settings</Text>
-                    <View style={[styles.infoRow, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }]}>
-                        <Text style={styles.value}>Push Notifications</Text>
+                <View style={styles.actionsRow}>
+                    <Button
+                        title="INVITE TEAM"
+                        onPress={() => navigation.navigate('InviteFriends')}
+                        variant="outline"
+                        style={{ flex: 1, marginRight: 8 }}
+                        icon={<Ionicons name="share-outline" size={16} color={theme.colors.text} />}
+                    />
+                    <Button
+                        title="SIGN OUT"
+                        onPress={handleSignOut}
+                        variant="ghost"
+                        style={{ flex: 1, marginLeft: 8, borderColor: theme.colors.error, borderWidth: 1 }}
+                        textStyle={{ color: theme.colors.error }}
+                    />
+                </View>
+
+                <Text style={styles.sectionLabel}>CONTACT_INFO</Text>
+                <Card style={styles.infoCard} variant="flat">
+                    <DataField label="EMAIL" value={auth.currentUser?.email} />
+                    <View style={styles.spacer} />
+                    <DataField label="PHONE" value={user?.phone} />
+                    <View style={styles.spacer} />
+                    <DataField label="INDUSTRY" value={user?.industry} />
+                </Card>
+
+                <Text style={styles.sectionLabel}>BIO</Text>
+                <Card style={styles.infoCard} variant="flat">
+                    <Text style={styles.bioText}>
+                        {user?.bio || 'No bio provided.'}
+                    </Text>
+                </Card>
+
+                <Text style={styles.sectionLabel}>SYSTEM</Text>
+                <Card style={styles.infoCard} variant="flat">
+                    <View style={[styles.infoRow, { justifyContent: 'space-between', alignItems: 'center' }]}>
+                        <Text style={styles.settingLabel}>NOTIFICATIONS</Text>
                         <TouchableOpacity
                             onPress={() => setNotificationsEnabled(!notificationsEnabled)}
                             style={[styles.toggle, notificationsEnabled && styles.toggleActive]}
@@ -121,11 +143,7 @@ export default function ProfileScreen() {
                             <View style={[styles.toggleKnob, notificationsEnabled && styles.toggleKnobActive]} />
                         </TouchableOpacity>
                     </View>
-                </View>
-
-                <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-                    <Text style={styles.signOutText}>Sign Out</Text>
-                </TouchableOpacity>
+                </Card>
             </ScrollView>
         </SafeAreaView>
     );
@@ -136,6 +154,28 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: theme.colors.background,
     },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: theme.spacing.lg,
+        paddingVertical: theme.spacing.md,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.colors.border,
+        backgroundColor: theme.colors.surface,
+    },
+    headerTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        letterSpacing: 1,
+        color: theme.colors.text,
+    },
+    editButtonText: {
+        fontSize: 12,
+        fontWeight: '600',
+        letterSpacing: 0.5,
+        color: theme.colors.primary,
+    },
     scrollContent: {
         padding: theme.spacing.lg,
     },
@@ -145,81 +185,107 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: theme.colors.background,
     },
-    title: {
-        ...theme.typography.h1,
+    profileHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
         marginBottom: theme.spacing.xl,
-        marginTop: theme.spacing.md,
-    },
-    card: {
+        padding: theme.spacing.md,
         backgroundColor: theme.colors.surface,
-        borderRadius: theme.borderRadius.lg,
-        padding: theme.spacing.lg,
-        marginBottom: theme.spacing.xl,
-        ...theme.shadows.card,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        borderRadius: theme.borderRadius.md,
     },
-    infoRow: {
-        marginBottom: theme.spacing.sm,
+    avatarContainer: {
+        width: 64,
+        height: 64,
+        borderRadius: theme.borderRadius.sm, // Sharper corners
+        backgroundColor: theme.colors.surfaceHighlight,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: theme.spacing.md,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
     },
-    label: {
+    avatarText: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: theme.colors.text,
+    },
+    headerInfo: {
+        flex: 1,
+    },
+    name: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: theme.colors.text,
+        marginBottom: 2,
+    },
+    role: {
         fontSize: 14,
         color: theme.colors.textSecondary,
-        marginBottom: 4,
+        marginBottom: 2,
     },
-    value: {
-        fontSize: 18,
-        color: theme.colors.text,
-        fontWeight: '500',
-    },
-    divider: {
-        height: 1,
-        backgroundColor: theme.colors.border,
-        marginVertical: theme.spacing.md,
-    },
-    signOutButton: {
-        borderWidth: 1,
-        borderColor: theme.colors.error,
-        padding: theme.spacing.md,
-        borderRadius: theme.borderRadius.md,
-        alignItems: 'center',
-        backgroundColor: 'transparent',
-    },
-    signOutText: {
-        color: theme.colors.error,
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    headerRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: theme.spacing.md,
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: theme.colors.primary,
-    },
-    editLink: {
-        color: theme.colors.secondary,
+    company: {
+        fontSize: 12,
         fontWeight: '600',
+        color: theme.colors.primary,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    actionsRow: {
+        flexDirection: 'row',
+        marginBottom: theme.spacing.xl,
+    },
+    sectionLabel: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: theme.colors.textSecondary,
+        marginBottom: theme.spacing.sm,
+        marginLeft: 2,
+        letterSpacing: 1,
+    },
+    infoCard: {
+        marginBottom: theme.spacing.lg,
+        padding: theme.spacing.md,
+    },
+    spacer: {
+        height: theme.spacing.md,
+    },
+    infoRow: {
+        paddingVertical: 4,
+    },
+    settingLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: theme.colors.text,
+        letterSpacing: 0.5,
+    },
+    bioText: {
+        fontSize: 14,
+        color: theme.colors.text,
+        lineHeight: 20,
     },
     toggle: {
-        width: 50,
-        height: 30,
-        borderRadius: 15,
-        backgroundColor: theme.colors.border,
+        width: 40,
+        height: 20,
+        borderRadius: 4, // Sharper
+        backgroundColor: theme.colors.surfaceHighlight,
         padding: 2,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
     },
     toggleActive: {
-        backgroundColor: theme.colors.success,
+        backgroundColor: theme.colors.primary,
+        borderColor: theme.colors.primary,
     },
     toggleKnob: {
-        width: 26,
-        height: 26,
-        borderRadius: 13,
-        backgroundColor: '#fff',
+        width: 14,
+        height: 14,
+        borderRadius: 2, // Square-ish
+        backgroundColor: theme.colors.textSecondary,
     },
     toggleKnobActive: {
         alignSelf: 'flex-end',
+        backgroundColor: '#fff',
     },
 });

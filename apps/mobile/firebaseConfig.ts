@@ -1,7 +1,8 @@
 import { initializeApp } from "firebase/app";
 import { getAnalytics, isSupported } from "firebase/analytics";
-import { initializeAuth, getReactNativePersistence } from "firebase/auth";
+import { initializeAuth, getReactNativePersistence, getAuth, Auth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Your web app's Firebase configuration
@@ -24,7 +25,7 @@ let analytics;
 isSupported().then(yes => yes && (analytics = getAnalytics(app)));
 
 // Initialize Auth with React Native persistence
-let auth;
+let auth: Auth;
 try {
     auth = initializeAuth(app, {
         persistence: getReactNativePersistence(AsyncStorage)
@@ -34,7 +35,6 @@ try {
     console.log("Firebase Auth initialization error:", e.message);
     // Fallback if already initialized or other error
     if (e.code === 'auth/already-initialized') {
-        const { getAuth } = require("firebase/auth");
         auth = getAuth(app);
         console.log("Firebase Auth retrieved from existing instance");
     } else {
@@ -43,5 +43,6 @@ try {
 }
 
 const db = getFirestore(app);
+const storage = getStorage(app);
 
-export { app, analytics, auth, db };
+export { app, analytics, auth, db, storage };

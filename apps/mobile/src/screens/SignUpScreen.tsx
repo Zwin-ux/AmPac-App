@@ -175,6 +175,6 @@ const styles = StyleSheet.create({
         marginTop: theme.spacing.md,
     },
     buttonText: {
-        ...theme.typography.button,
+        ...(theme.typography.button as any),
     },
 });
