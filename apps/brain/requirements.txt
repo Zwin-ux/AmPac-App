@@ -10,3 +10,4 @@ httpx
 azure-identity
 msgraph-core
 msgraph-sdk
+pydantic-settings
