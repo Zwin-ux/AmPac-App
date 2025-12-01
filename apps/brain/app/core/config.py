@@ -19,6 +19,16 @@ class Settings(BaseSettings):
     AZURE_CLIENT_ID: Optional[str] = None
     AZURE_CLIENT_SECRET: Optional[str] = None
 
+    # Ventures API
+    VENTURES_USERNAME: Optional[str] = None
+    VENTURES_PASSWORD: Optional[str] = None
+    VENTURES_MOCK_MODE: bool = True
+
+    # ShareFile API
+    SHAREFILE_CLIENT_ID: Optional[str] = None
+    SHAREFILE_CLIENT_SECRET: Optional[str] = None
+    SHAREFILE_SUBDOMAIN: str = "ampac" # e.g., https://ampac.sharefile.com
+
     class Config:
         env_file = ".env"
 

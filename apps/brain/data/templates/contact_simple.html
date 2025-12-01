@@ -1,0 +1,44 @@
+<!-- Contact Section -->
+<div id="contact" class="bg-white py-16 px-4 overflow-hidden sm:px-6 lg:px-8 lg:py-24">
+    <div class="relative max-w-xl mx-auto">
+        <div class="text-center">
+            <h2 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">
+                Contact Us
+            </h2>
+            <p class="mt-4 text-lg leading-6 text-gray-500">
+                Ready to get started? Reach out to us today.
+            </p>
+        </div>
+        <div class="mt-12">
+            <div class="grid grid-cols-1 gap-y-6 sm:grid-cols-2 sm:gap-x-8">
+                <div class="sm:col-span-2">
+                    <div class="flex items-center justify-center">
+                        <div class="text-lg text-gray-900">
+                            <p class="font-bold">Address:</p>
+                            <p>{{ business_address }}</p>
+                            <p>{{ business_zip }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="sm:col-span-2 mt-4">
+                    <div class="flex items-center justify-center space-x-4">
+                        <a href="tel:{{ business_phone }}" class="text-blue-600 hover:text-blue-800 font-medium">
+                            {{ business_phone }}
+                        </a>
+                        <span class="text-gray-300">|</span>
+                        <a href="mailto:{{ business_email }}" class="text-blue-600 hover:text-blue-800 font-medium">
+                            Email Us
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<footer class="bg-gray-800">
+    <div class="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+        <p class="text-center text-base text-gray-400">
+            &copy; 2025 {{ business_name }}. All rights reserved.
+        </p>
+    </div>
+</footer>

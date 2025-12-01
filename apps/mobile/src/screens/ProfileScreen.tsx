@@ -103,7 +103,7 @@ export default function ProfileScreen({ navigation }: any) {
                     <Button
                         title="INVITE TEAM"
                         onPress={() => navigation.navigate('InviteFriends')}
-                        variant="outline"
+                        variant="secondary"
                         style={{ flex: 1, marginRight: 8 }}
                         icon={<Ionicons name="share-outline" size={16} color={theme.colors.text} />}
                     />

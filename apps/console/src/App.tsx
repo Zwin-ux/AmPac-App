@@ -6,6 +6,8 @@ import LoginPage from './pages/LoginPage';
 import WorkboardPage from './pages/WorkboardPage';
 import ApplicationDetailPage from './pages/ApplicationDetailPage';
 import AdminPage from './pages/AdminPage';
+import VenturesDashboard from './pages/VenturesDashboard';
+import BrainPage from './pages/BrainPage';
 import DashboardLayout from './layouts/DashboardLayout';
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -47,6 +49,8 @@ export default function App() {
           <Route index element={<WorkboardPage />} />
           <Route path="applications/:id" element={<ApplicationDetailPage />} />
           <Route path="search" element={<div className="p-8 text-textSecondary">Search Page (Coming Soon)</div>} />
+          <Route path="ventures" element={<VenturesDashboard />} />
+          <Route path="brain" element={<BrainPage />} />
           <Route path="admin" element={<AdminPage />} />
         </Route>
       </Routes>

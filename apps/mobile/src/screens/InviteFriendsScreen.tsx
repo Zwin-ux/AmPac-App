@@ -130,7 +130,7 @@ export default function InviteFriendsScreen({ navigation }: any) {
             <FlatList
                 data={filteredContacts}
                 renderItem={renderItem}
-                keyExtractor={(item) => item.id || (item as any).identifier || Math.random().toString()}
+                keyExtractor={(item) => (item as any).id || (item as any).identifier || Math.random().toString()}
                 contentContainerStyle={styles.listContent}
                 ListEmptyComponent={
                     <View style={styles.centered}>

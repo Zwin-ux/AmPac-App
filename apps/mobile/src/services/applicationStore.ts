@@ -8,6 +8,10 @@ import { app } from '../../firebaseConfig';
 const DRAFT_STORAGE_KEY = 'app_draft_v1';
 const SAVE_DEBOUNCE_MS = 800;
 
+const logStoreEvent = (event: string, meta?: Record<string, any>) => {
+    console.debug(`[ApplicationStore] ${event}`, meta ?? {});
+};
+
 type Subscriber = (state: ApplicationStoreState) => void;
 
 export interface ApplicationStoreState {
@@ -73,12 +77,15 @@ class ApplicationStore {
             if (stored) {
                 const draft = JSON.parse(stored) as Application;
                 this.setState({ draft, isHydrated: true, syncStatus: 'local' });
+                logStoreEvent('hydrateFromStorage', { hasDraft: true });
                 return draft;
             }
             this.setState({ isHydrated: true });
+            logStoreEvent('hydrateFromStorage', { hasDraft: false });
             return null;
         } catch (error) {
             console.error('Error hydrating from storage:', error);
+            logStoreEvent('hydrateFromStorage.error', { error });
             this.setState({ isHydrated: true });
             return null;
         }
@@ -89,6 +96,7 @@ class ApplicationStore {
         const userId = auth.currentUser?.uid || 'dev-user';
         
         this.setState({ syncStatus: 'syncing' });
+        logStoreEvent('syncWithServer.start', { userId });
 
         try {
             const serverApp = await getApplication(userId);
@@ -114,10 +122,12 @@ class ApplicationStore {
                 }
             } else {
                 this.setState({ syncStatus: 'synced', lastSyncedAt: Date.now() });
+                logStoreEvent('syncWithServer.nodata', { userId });
                 return this.state.draft;
             }
         } catch (error) {
             console.error('Error syncing with server:', error);
+            logStoreEvent('syncWithServer.error', { error });
             this.setState({ syncStatus: 'offline' });
             return this.state.draft;
         }
@@ -233,6 +243,7 @@ class ApplicationStore {
                 this.pendingSave = null;
             }
         }, SAVE_DEBOUNCE_MS);
+        logStoreEvent('queueSave', { appId: draft.id, nextSyncStatus: this.state.syncStatus });
     }
 
     async flushSave(): Promise<void> {
@@ -255,19 +266,23 @@ class ApplicationStore {
             await AsyncStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
         } catch (error) {
             console.error('Error persisting to storage:', error);
+            logStoreEvent('persistToStorage.error', { appId: draft.id, error });
         }
     }
 
     private async persistToServer(draft: Application): Promise<void> {
         this.setState({ syncStatus: 'syncing' });
+        logStoreEvent('persistToServer.start', { appId: draft.id });
         try {
             await saveApplication(draft.id, {
                 ...draft,
                 lastUpdated: Timestamp.now(),
             });
             this.setState({ syncStatus: 'synced', lastSyncedAt: Date.now() });
+            logStoreEvent('persistToServer.success', { appId: draft.id });
         } catch (error) {
             console.error('Error persisting to server:', error);
+            logStoreEvent('persistToServer.error', { appId: draft.id, error });
             this.setState({ syncStatus: 'offline' });
         }
     }

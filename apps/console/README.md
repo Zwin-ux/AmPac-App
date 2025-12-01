@@ -71,3 +71,9 @@ export default defineConfig([
   },
 ])
 ```
+
+## Data contract parity with mobile
+
+- `apps/console/src/types/index.ts` mirrors `apps/mobile/src/types.ts` because both apps read/write the same Firestore collections (`users`, `applications`, `documents`, etc.). Before adding fields or removing values, update both files and confirm the new schema is persisted by `apps/mobile/src/services/*` or `apps/console/src/services/*`.
+- The console UI uses a `rejected` status (see `ApplicationDetailPage.tsx`), so the `ApplicationStatus` union must include that value to stay type-safe. If Firestore adds another status, add it here and in the mobile union at the same time.
+- Any Firestore field that surfaces in a service (e.g., `loanService.updateFlags`, `documentService.recordUpload`, `taskService.createTask`) should have a matching optional property in these shared types so TypeScript can catch schema drift early.

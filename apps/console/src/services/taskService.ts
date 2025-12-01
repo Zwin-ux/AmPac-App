@@ -10,7 +10,7 @@ import {
     Timestamp
 } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
-import { Task, TaskStatus, TaskPriority, TaskType } from '../types';
+import type { Task, TaskStatus } from '../types';
 
 const COLLECTION = 'tasks';
 

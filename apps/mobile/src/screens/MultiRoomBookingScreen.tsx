@@ -76,7 +76,7 @@ export default function MultiRoomBookingScreen() {
                     roomId: room.id,
                     startTime: slotStart,
                     endTime: slotEnd,
-                    status: 'confirmed',
+                    status: 'confirmed' as const,
                     priceBreakdown: roomQuote?.priceBreakdown,
                     graphEventId,
                 };
@@ -241,8 +241,6 @@ const styles = StyleSheet.create({
         backgroundColor: theme.colors.surface,
         padding: theme.spacing.lg,
         borderRadius: theme.borderRadius.lg,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
         marginBottom: theme.spacing.lg,
         ...theme.shadows.card,
     },

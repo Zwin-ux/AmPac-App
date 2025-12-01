@@ -1,6 +1,7 @@
 import { Timestamp } from 'firebase/firestore';
 
 // --- Enums & Unions ---
+// Keep this file aligned with apps/mobile/src/types.ts because both apps share the same Firestore collections (users, applications, documents, etc.).
 
 export type UserRole = 'entrepreneur' | 'ampac_staff';
 
@@ -20,6 +21,7 @@ export type ApplicationStatus =
     | 'closing'
     | 'funded'
     | 'declined'
+    | 'rejected'
     | 'withdrawn';
 
 export type ApplicationSourceChannel = 'web_portal' | 'internal_staff_intake' | 'referral_partner' | 'upload_from_ventures';
@@ -220,4 +222,38 @@ export interface Business {
     description?: string;
     imageUrl?: string;
     ownerName?: string;
+}
+
+// --- Ventures Integration Types ---
+
+export type SyncMode = 'dry_run' | 'validate' | 'commit';
+export type SyncStatus = 'pending' | 'in_progress' | 'success' | 'failed' | 'validation_error';
+
+export interface VenturesSyncLog {
+    id: string;
+    loanApplicationId: string;
+    timestamp: number;
+    actorId: string; // Staff UID
+    mode: SyncMode;
+    status: SyncStatus;
+    summary: string;
+    details?: string; // JSON string of diffs or errors
+    note?: string; // Human note
+}
+
+export interface VenturesFieldMapping {
+    field: string;
+    ampacValue: any;
+    venturesValue: any;
+    sourceOfTruth: 'ampac' | 'ventures';
+    status: 'match' | 'mismatch' | 'ignored';
+    isLocked?: boolean;
+}
+
+export interface VenturesLoanStatus {
+    venturesLoanId: string;
+    lastSync: number;
+    status: 'connected' | 'disconnected' | 'error';
+    fieldMappings: VenturesFieldMapping[];
+    syncLogs: VenturesSyncLog[];
 }

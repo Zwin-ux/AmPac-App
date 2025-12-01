@@ -10,11 +10,12 @@ const overlaps = (aStart: Timestamp, aEnd: Timestamp, bStart: Timestamp, bEnd: T
 
 const flattenBookingItems = (booking: Booking): BookingItem[] => {
     if (booking.items && booking.items.length > 0) return booking.items;
-    if (booking.roomId && booking.startTime && booking.endTime) {
+    const legacyBooking = booking as any;
+    if (legacyBooking.roomId && legacyBooking.startTime && legacyBooking.endTime) {
         return [{
-            roomId: booking.roomId,
-            startTime: booking.startTime,
-            endTime: booking.endTime,
+            roomId: legacyBooking.roomId,
+            startTime: legacyBooking.startTime,
+            endTime: legacyBooking.endTime,
             status: booking.status,
         }];
     }

@@ -231,8 +231,6 @@ const styles = StyleSheet.create({
         padding: theme.spacing.xl,
         backgroundColor: theme.colors.surface,
         borderRadius: theme.borderRadius.lg,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
         ...theme.shadows.card,
     },
     taHeader: {

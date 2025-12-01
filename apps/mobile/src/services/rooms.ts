@@ -46,11 +46,12 @@ const buildMockPricingRules = (room: Room) => ([
 const normalizeBookingPayload = (booking: Omit<Booking, 'id'>): Omit<Booking, 'id'> => {
     if (booking.items && booking.items.length > 0) return booking;
 
-    const items = (booking.roomId && booking.startTime && booking.endTime)
+    const legacyBooking = booking as any;
+    const items = (legacyBooking.roomId && legacyBooking.startTime && legacyBooking.endTime)
         ? [{
-            roomId: booking.roomId,
-            startTime: booking.startTime,
-            endTime: booking.endTime,
+            roomId: legacyBooking.roomId,
+            startTime: legacyBooking.startTime,
+            endTime: legacyBooking.endTime,
             status: booking.status,
         }]
         : [];

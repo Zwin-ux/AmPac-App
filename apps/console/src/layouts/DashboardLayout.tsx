@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, FileText, Settings, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Settings, LogOut, Menu, X, Activity, Brain } from 'lucide-react';
 import { getAuth, signOut } from 'firebase/auth';
 import { app } from '../firebaseConfig';
+import CopilotSidebar from '../components/CopilotSidebar';
 
 export default function DashboardLayout() {
     const navigate = useNavigate();
@@ -23,7 +24,9 @@ export default function DashboardLayout() {
     const navItems = [
         { icon: LayoutDashboard, label: 'Workboard', path: '/' },
         { icon: Users, label: 'Staff Directory', path: '/admin' },
-        { icon: FileText, label: 'Applications', path: '/search' }, // Placeholder
+        { icon: FileText, label: 'Applications', path: '/search' },
+        { icon: Activity, label: 'Ventures', path: '/ventures' },
+        { icon: Brain, label: 'Brain Console', path: '/brain' },
         { icon: Settings, label: 'Settings', path: '/settings' },
     ];
 
@@ -69,8 +72,8 @@ export default function DashboardLayout() {
                                     setIsMobileMenuOpen(false);
                                 }}
                                 className={`w-full flex items-center px-4 py-3 rounded-md text-sm font-medium transition-colors ${isActive
-                                        ? 'bg-primary text-white'
-                                        : 'text-textSecondary hover:bg-surfaceHighlight hover:text-primary'
+                                    ? 'bg-primary text-white'
+                                    : 'text-textSecondary hover:bg-surfaceHighlight hover:text-primary'
                                     }`}
                             >
                                 <Icon className="w-5 h-5 mr-3" />
@@ -92,8 +95,12 @@ export default function DashboardLayout() {
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 overflow-auto pt-16 md:pt-0 w-full">
-                <Outlet />
+            <main className="flex-1 flex overflow-hidden pt-16 md:pt-0 w-full relative">
+                <div className="flex-1 overflow-auto">
+                    <Outlet />
+                </div>
+                {/* Feature Flag: Staff Copilot */}
+                <CopilotSidebar />
             </main>
         </div>
     );

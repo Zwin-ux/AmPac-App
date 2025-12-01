@@ -2,10 +2,11 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, Share, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../theme';
-import { auth } from '../../firebaseConfig';
+import { auth, db } from '../../firebaseConfig';
+import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import { flushPendingApplicationWrites } from '../services/applications';
 import { applicationStore, ApplicationStoreState } from '../services/applicationStore';
-import { Application, SyncStatus } from '../types';
+import { Application, SyncStatus, Task } from '../types';
 import AssistantBubble from '../components/AssistantBubble';
 import SyncStatusBadge from '../components/SyncStatusBadge';
 import QuickApplySheet from '../components/QuickApplySheet';
@@ -16,6 +17,8 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { FormInput } from '../components/ui/FormInput';
 import { DataField } from '../components/ui/DataField';
+import { TaskList } from '../components/TaskList';
+import { LoanStatusTracker } from '../components/LoanStatusTracker';
 
 type DocumentRequirement = {
     id: string;
@@ -73,6 +76,7 @@ export default function ApplicationScreen() {
     const [documents, setDocuments] = useState<DocumentRequirement[]>(REQUIRED_DOCUMENTS.map(doc => ({ ...doc, status: 'pending' as const })));
     const [eligibilitySummary, setEligibilitySummary] = useState<string | null>(null);
     const [handoffLink, setHandoffLink] = useState<string | null>(null);
+    const [tasks, setTasks] = useState<Task[]>([]);
 
     const documentsCompleted = useMemo(
         () => documents.filter(doc => doc.uploaded).length,
@@ -103,6 +107,32 @@ export default function ApplicationScreen() {
 
         return unsubscribe;
     }, [currentStep]);
+
+    // Subscribe to tasks
+    useEffect(() => {
+        if (!application?.id) return;
+
+        const q = query(
+            collection(db, 'tasks'),
+            where('loanApplicationId', '==', application.id),
+            orderBy('createdAt', 'desc')
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const fetchedTasks = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            })) as Task[];
+            setTasks(fetchedTasks);
+        });
+
+        return () => unsubscribe();
+    }, [application?.id]);
+
+    const refreshTasks = async () => {
+        // In a real app, this might trigger a cloud function to sync tasks from Ventures
+        // For now, it's a no-op as the subscription handles updates
+    };
 
     // OPTIMISTIC: Background hydration - doesn't block render
     useEffect(() => {
@@ -243,8 +273,19 @@ export default function ApplicationScreen() {
         setDocuments(nextDocs);
 
         try {
-            const path = buildStoragePath(application.id, docId, picked.name);
-            const downloadUrl = await uploadFileFromUri(picked.uri, path);
+            const path = buildStoragePath({
+                userId: application.id, // Using application ID as user ID context for now, or auth.currentUser.uid
+                applicationId: application.id,
+                docId,
+                fileName: picked.name
+            });
+            
+            const uploadResult = await uploadFileFromUri({
+                uri: picked.uri,
+                path,
+                name: picked.name,
+                mimeType: picked.mimeType
+            });
 
             const updatedDocs: DocumentRequirement[] = documents.map(doc =>
                 doc.id === docId
@@ -252,7 +293,9 @@ export default function ApplicationScreen() {
                         ...doc,
                         status: 'completed' as const,
                         uploaded: true,
-                        downloadUrl,
+                        downloadUrl: uploadResult.downloadUrl,
+                        size: uploadResult.size,
+                        contentType: uploadResult.contentType,
                         uploadedAt: new Date().toISOString(),
                     }
                     : doc
@@ -569,6 +612,27 @@ export default function ApplicationScreen() {
         </View>
     );
 
+    if (application && application.status !== 'draft') {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                        <Ionicons name="chevron-back" size={18} color={theme.colors.primary} />
+                        <Text style={styles.backButtonText}>Back</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Application Status</Text>
+                    <View style={{ width: 60 }} />
+                </View>
+                <ScrollView contentContainerStyle={styles.scrollContent}>
+                    <LoanStatusTracker status={application.status} />
+                    <View style={{ height: 20 }} />
+                    <TaskList tasks={tasks} onRefresh={refreshTasks} />
+                </ScrollView>
+                <AssistantBubble context="application" />
+            </SafeAreaView>
+        );
+    }
+
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
@@ -662,8 +726,6 @@ const styles = StyleSheet.create({
         padding: theme.spacing.lg,
         borderRadius: theme.borderRadius.lg,
         marginBottom: theme.spacing.md,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
         ...theme.shadows.card,
     },
     cardHeader: {

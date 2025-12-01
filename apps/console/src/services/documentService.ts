@@ -9,7 +9,7 @@ import {
     Timestamp
 } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
-import { DocumentRequest, Document, DocumentRequestStatus } from '../types';
+import type { DocumentRequest, Document, DocumentRequestStatus } from '../types';
 
 const REQUESTS_COLLECTION = 'document_requests';
 const DOCS_COLLECTION = 'documents';

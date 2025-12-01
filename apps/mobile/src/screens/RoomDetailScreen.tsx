@@ -147,7 +147,7 @@ export default function RoomDetailScreen() {
 
                     <Text style={styles.sectionTitle}>Amenities</Text>
                     <View style={styles.amenitiesContainer}>
-                        {room.amenities.map((amenity, index) => (
+                        {room.amenities.map((amenity: string, index: number) => (
                             <View key={index} style={styles.amenityRow}>
                                 <View style={styles.bullet} />
                                 <Text style={styles.amenityText}>{amenity}</Text>
@@ -175,9 +175,9 @@ export default function RoomDetailScreen() {
                         <Text style={styles.breakdownLabelTotal}>Total</Text>
                         <Text style={styles.breakdownValueTotal}>${pricing.priceBreakdown.total.toFixed(2)}</Text>
                     </View>
-                    {pricing.priceBreakdown.appliedRules?.length > 0 && (
+                    {(pricing.priceBreakdown.appliedRules?.length ?? 0) > 0 && (
                         <Text style={styles.appliedRulesText}>
-                            Tiered pricing applied: {pricing.priceBreakdown.appliedRules.join(', ')}
+                            Tiered pricing applied: {pricing.priceBreakdown.appliedRules?.join(', ')}
                         </Text>
                     )}
                 </View>

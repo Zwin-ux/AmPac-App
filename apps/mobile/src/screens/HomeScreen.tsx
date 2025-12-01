@@ -6,25 +6,38 @@ import { Ionicons } from '@expo/vector-icons';
 import AssistantBubble from '../components/AssistantBubble';
 import OfflineBanner from '../components/OfflineBanner';
 import { userStore } from '../services/userStore';
+import { applicationStore } from '../services/applicationStore';
 import { theme } from '../theme';
-import { User } from '../types';
+import { User, Application } from '../types';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { LoanStatusTracker } from '../components/LoanStatusTracker';
 
 export default function HomeScreen() {
     const [user, setUser] = useState<User | null>(() => userStore.getCachedUser());
+    const [activeApplication, setActiveApplication] = useState<Application | null>(null);
     const navigation = useNavigation<any>();
 
     useEffect(() => {
-        const unsubscribe = userStore.subscribe(setUser);
+        const unsubscribeUser = userStore.subscribe(setUser);
+        const unsubscribeApp = applicationStore.subscribe((apps) => {
+            // Find the most relevant active application
+            const active = apps.find(a => a.status !== 'withdrawn' && a.status !== 'declined') || null;
+            setActiveApplication(active);
+        });
 
         const hydrate = async () => {
             await userStore.hydrateFromStorage();
             userStore.syncWithServer();
+            await applicationStore.hydrateFromStorage();
+            applicationStore.syncWithServer();
         };
         hydrate();
 
-        return unsubscribe;
+        return () => {
+            unsubscribeUser();
+            unsubscribeApp();
+        };
     }, []);
 
     const userName = user?.fullName?.split(' ')[0] || 'Entrepreneur';
@@ -43,24 +56,35 @@ export default function HomeScreen() {
             </View>
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                {user?.businessName && (
-                    <Card style={styles.businessCard}>
-                        <View style={styles.businessHeader}>
-                            <Text style={styles.businessLabel}>YOUR BUSINESS</Text>
-                            <Ionicons name="trending-up" size={20} color={theme.colors.accent} />
-                        </View>
-                        <Text style={styles.businessName}>{user.businessName}</Text>
-                        <View style={styles.businessStats}>
-                            <View>
-                                <Text style={styles.statLabel}>STATUS</Text>
-                                <Text style={styles.statValue}>Active</Text>
+                {/* Loan Status Tracker (Pizza Tracker) */}
+                {activeApplication ? (
+                    <View style={{ marginBottom: theme.spacing.xl }}>
+                        <Text style={styles.sectionTitle}>LOAN STATUS</Text>
+                        <LoanStatusTracker 
+                            status={activeApplication.status} 
+                            venturesStatus={activeApplication.venturesStatus} 
+                        />
+                    </View>
+                ) : (
+                    user?.businessName && (
+                        <Card style={styles.businessCard}>
+                            <View style={styles.businessHeader}>
+                                <Text style={styles.businessLabel}>YOUR BUSINESS</Text>
+                                <Ionicons name="trending-up" size={20} color={theme.colors.accent} />
                             </View>
-                            <View>
-                                <Text style={styles.statLabel}>MEMBER SINCE</Text>
-                                <Text style={styles.statValue}>2023</Text>
+                            <Text style={styles.businessName}>{user.businessName}</Text>
+                            <View style={styles.businessStats}>
+                                <View>
+                                    <Text style={styles.statLabel}>STATUS</Text>
+                                    <Text style={styles.statValue}>Active</Text>
+                                </View>
+                                <View>
+                                    <Text style={styles.statLabel}>MEMBER SINCE</Text>
+                                    <Text style={styles.statValue}>2023</Text>
+                                </View>
                             </View>
-                        </View>
-                    </Card>
+                        </Card>
+                    )
                 )}
 
                 <Text style={styles.sectionTitle}>Quick Actions</Text>
@@ -87,6 +111,19 @@ export default function HomeScreen() {
                                 <Text style={styles.actionTitle}>Book Space</Text>
                                 <Text style={styles.actionDescription}>Reserve a room</Text>
                             </View>
+                        </TouchableOpacity>
+                    </Card>
+
+                    <Card style={styles.fullWidthCard}>
+                        <TouchableOpacity onPress={() => navigation.navigate('WebsiteBuilder')} style={styles.rowAction}>
+                            <View style={styles.iconContainer}>
+                                <Ionicons name="globe-outline" size={20} color={theme.colors.text} />
+                            </View>
+                            <View style={styles.rowContent}>
+                                <Text style={styles.actionTitle}>Website Builder</Text>
+                                <Text style={styles.actionDescription}>Create a professional site in seconds</Text>
+                            </View>
+                            <Ionicons name="arrow-forward" size={20} color={theme.colors.textSecondary} />
                         </TouchableOpacity>
                     </Card>
 

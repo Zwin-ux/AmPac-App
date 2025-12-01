@@ -6,13 +6,11 @@ import {
     query,
     where,
     orderBy,
-    addDoc,
     updateDoc,
-    Timestamp,
-    DocumentData
+    Timestamp
 } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
-import { Application, ApplicationStatus, ApplicationFlag } from '../types';
+import type { Application, ApplicationStatus, ApplicationFlag } from '../types';
 
 const COLLECTION = 'applications';
 

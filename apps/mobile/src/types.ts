@@ -10,8 +10,12 @@ export type OrganizationType = 'cdc' | 'lender_partner' | 'internal_ampac';
 
 export type LoanProductCode = 'sba_504' | 'sba_7a' | 'ca_ibank_guarantee' | 'internal_micro';
 
+// Alias for backward compatibility
+export type ApplicationType = LoanProductCode;
+
 export type ApplicationStatus =
     | 'draft'
+    | 'quick_draft'
     | 'submitted'
     | 'in_review'
     | 'conditional_approval'
@@ -109,6 +113,7 @@ export interface Application {
 
     // External IDs
     venturesLoanId?: string;
+    venturesStatus?: string; // Raw status from LOS
     sbaEtranApplicationId?: string;
 
     // Metadata
@@ -122,6 +127,9 @@ export interface Application {
     businessName?: string; // Denormalized for easy access
     phone?: string;
     data?: Record<string, any>;
+    loanAmount?: number; // Legacy field for requested amount
+    version?: number; // For optimistic concurrency control
+    lastSyncedAt?: Timestamp;
 }
 
 export interface Participant {
@@ -294,4 +302,40 @@ export interface PricingQuoteResponse {
     items: { roomId: string; priceBreakdown: PriceBreakdown; appliedRules: string[]; }[];
     total: number;
     currency: string;
+}
+
+export interface Room {
+    id: string;
+    name: string;
+    pricePerHour: number;
+    capacity: number;
+    description?: string;
+    amenities: string[];
+    imageUrl?: string;
+    location?: string;
+    timezone?: string;
+    graphResourceId?: string;
+    pricingRules?: PricingRule[];
+}
+
+export interface Booking {
+    id: string;
+    userId: string;
+    status: 'pending' | 'confirmed' | 'cancelled' | 'on_hold';
+    items: BookingItem[];
+    totalPrice: number;
+    createdAt: Timestamp;
+    holdExpiresAt?: Timestamp;
+    holdId?: string;
+}
+
+export interface Business {
+    id: string; // usually same as owner uid
+    ownerId?: string;
+    name: string;
+    industry: string;
+    city: string;
+    description?: string;
+    imageUrl?: string;
+    ownerName?: string;
 }

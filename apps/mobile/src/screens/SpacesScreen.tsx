@@ -85,7 +85,7 @@ export default function SpacesScreen() {
                     </View>
                     <Text style={styles.capacity}>Capacity: {item.capacity} people</Text>
                     <View style={styles.amenitiesContainer}>
-                        {item.amenities.slice(0, 3).map((amenity, index) => (
+                        {item.amenities.slice(0, 3).map((amenity: string, index: number) => (
                             <View key={index} style={styles.amenityBadge}>
                                 <Text style={styles.amenityText}>{amenity}</Text>
                             </View>
@@ -212,8 +212,6 @@ const styles = StyleSheet.create({
         marginBottom: theme.spacing.lg,
         overflow: 'hidden',
         ...theme.shadows.card,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
     },
     cardSelected: {
         borderColor: theme.colors.primary,
@@ -278,8 +276,6 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         borderRadius: 20,
         backgroundColor: theme.colors.surface,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
         marginRight: 8,
         ...theme.shadows.card,
     },
@@ -356,8 +352,6 @@ const styles = StyleSheet.create({
         bottom: theme.spacing.lg,
         backgroundColor: theme.colors.surface,
         borderRadius: theme.borderRadius.lg,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
         padding: theme.spacing.md,
         flexDirection: 'row',
         justifyContent: 'space-between',

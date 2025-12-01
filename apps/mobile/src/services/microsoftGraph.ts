@@ -96,7 +96,7 @@ const interactiveAuth = async () => {
     });
 
     await request.makeAuthUrlAsync(discovery);
-    const result = await request.promptAsync(discovery, { useProxy });
+    const result = await request.promptAsync(discovery);
     if (result.type !== 'success' || !result.params.code) {
         throw new Error('Graph sign-in cancelled or failed');
     }

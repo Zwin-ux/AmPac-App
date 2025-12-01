@@ -12,13 +12,14 @@ import {
 import { db } from '../../firebaseConfig';
 import { Application, ApplicationType } from '../types';
 import { cacheService } from './cache';
-import { syncService } from './sync';
+import { syncService, SyncJob } from './sync';
 
 export const APPLICATION_CACHE_KEY_PREFIX = 'cache_application_';
 const buildCacheKey = (userId: string) => `${APPLICATION_CACHE_KEY_PREFIX}${userId}`;
 
 export const cacheApplicationSnapshot = async (application: Application): Promise<void> => {
     try {
+        if (!application.userId) return;
         await cacheService.set(buildCacheKey(application.userId), application);
     } catch (error) {
         console.error("Error caching application snapshot:", error);
@@ -63,6 +64,11 @@ export const getApplication = async (userId: string): Promise<Application | null
     }
 };
 
+const queueOfflineWrite = async (job: Omit<SyncJob, 'id' | 'timestamp'>) => {
+    console.warn('Queueing offline write', { collection: job.collection, docId: job.docId, merge: job.merge });
+    await syncService.queueWrite(job);
+};
+
 export const saveApplication = async (id: string, data: Partial<Application>): Promise<void> => {
     try {
         const appDoc = doc(db, 'applications', id);
@@ -105,7 +111,7 @@ export const saveApplication = async (id: string, data: Partial<Application>): P
     } catch (error) {
         console.error("Error saving application:", error);
         if (data.userId) {
-            await syncService.queueWrite({
+            await queueOfflineWrite({
                 collection: 'applications',
                 docId: id,
                 payload: {
@@ -116,7 +122,7 @@ export const saveApplication = async (id: string, data: Partial<Application>): P
                 merge: true,
             });
         }
-        // Do not rethrow to allow offline-first flow to continue; queued writes will flush later.
+        throw error;
     }
 };
 
@@ -148,7 +154,7 @@ export const createApplication = async (userId: string, type: ApplicationType): 
         return newApp;
     } catch (error) {
         console.error("Error creating application:", error);
-        await syncService.queueWrite({
+        await queueOfflineWrite({
             collection: 'applications',
             docId: newApp.id,
             payload: newApp,
