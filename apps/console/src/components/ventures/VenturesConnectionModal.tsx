@@ -11,7 +11,7 @@ interface VenturesConnectionModalProps {
 export default function VenturesConnectionModal({ isOpen, onClose, onSuccess }: VenturesConnectionModalProps) {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
-    const [siteName, setSiteName] = useState('test_integration');
+    const [siteName] = useState('ampac'); // Hardcoded for Zero-Config
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -53,32 +53,28 @@ export default function VenturesConnectionModal({ isOpen, onClose, onSuccess }: 
                         </div>
                     )}
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Site Name</label>
-                        <select
-                            value={siteName}
-                            onChange={(e) => setSiteName(e.target.value)}
-                            className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                        >
-                            <option value="test_integration">Sandbox (test_integration)</option>
-                            <option value="production">Production</option>
-                        </select>
+                    <div className="bg-blue-50 p-4 rounded-md mb-4 text-sm text-blue-800">
+                        <p className="font-medium mb-1">One-time Setup</p>
+                        <p>Enter your Ventures credentials once. We'll securely store them so you don't have to log in again.</p>
                     </div>
 
+                    {/* Hidden Site Name - Hardcoded to 'ampac' or 'test_integration' for now */}
+                    <input type="hidden" value={siteName} />
+
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">API Username</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Ventures Username</label>
                         <input
                             type="text"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
                             className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
-                            placeholder="e.g. api_user"
+                            placeholder="e.g. jdoe"
                             required
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">API Password</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Ventures Password</label>
                         <input
                             type="password"
                             value={password}
@@ -106,7 +102,7 @@ export default function VenturesConnectionModal({ isOpen, onClose, onSuccess }: 
                             )}
                         </button>
                     </div>
-                    
+
                     <p className="text-xs text-gray-500 text-center mt-4">
                         Credentials are encrypted and stored securely.
                     </p>
