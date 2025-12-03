@@ -40,29 +40,50 @@ export default function CopilotSidebar() {
         setInputText('');
         setIsLoading(true);
 
-        // Mock API
-        setTimeout(() => {
-            let responseText = "I've analyzed the current file. No major risks detected.";
-            const lower = userMsg.text.toLowerCase();
-            let flags = {};
+        // Call Backend API
+        try {
+            const { API_URL } = await import('../config');
+            const response = await fetch(`${API_URL}/agents/copilot`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    query: userMsg.text,
+                    context: {
+                        page: window.location.pathname,
+                        role: 'staff_member'
+                    }
+                }),
+            });
 
-            if (lower.includes('summarize')) {
-                responseText = "## Loan Summary\n- **Applicant**: Rivera Innovations\n- **Amount**: $1.2M\n- **Purpose**: CRE Acquisition\n- **Risk Score**: 75/100 (Moderate)";
-            } else if (lower.includes('email') || lower.includes('draft')) {
-                responseText = "Here is a draft for the borrower:\n\nSubject: Missing Documents\n\nDear Alex,\n\nPlease provide the updated 2024 interim financials. Thank you.";
-                flags = { requires_human_review: true };
+            if (!response.ok) {
+                throw new Error('Failed to fetch response');
             }
+
+            const data = await response.json();
 
             const aiMsg: Message = {
                 id: (Date.now() + 1).toString(),
-                text: responseText,
+                text: data.response,
                 sender: 'ai',
                 timestamp: Date.now(),
-                flags
+                flags: data.flags // Assuming backend returns flags if needed
             };
             setMessages(prev => [...prev, aiMsg]);
+
+        } catch (error) {
+            console.error("Copilot Error:", error);
+            const errorMsg: Message = {
+                id: (Date.now() + 1).toString(),
+                text: "Sorry, I'm having trouble connecting to the Brain. Please try again.",
+                sender: 'ai',
+                timestamp: Date.now(),
+            };
+            setMessages(prev => [...prev, errorMsg]);
+        } finally {
             setIsLoading(false);
-        }, 1500);
+        }
     };
 
     if (!isOpen) {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Activity, AlertTriangle, CheckCircle, Clock, RefreshCw, Search, Link, Lock } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle, Clock, RefreshCw, Search, Link } from 'lucide-react';
 import { venturesService } from '../services/venturesService';
 import VenturesConnectionModal from '../components/ventures/VenturesConnectionModal';
 import type { VenturesSyncLog } from '../types';

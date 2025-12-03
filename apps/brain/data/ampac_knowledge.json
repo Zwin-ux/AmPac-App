@@ -1,0 +1,182 @@
+{
+    "organization": {
+        "name": "AmPac Business Capital",
+        "website": "https://ampac.com",
+        "type": "Nonprofit 501(c)(3)",
+        "founded": 2005,
+        "headquarters": {
+            "address": "3110 B Inland Empire Blvd, Ontario, CA 91764",
+            "region": "Inland Empire"
+        },
+        "operating_regions": [
+            "California",
+            "Arizona",
+            "Nevada"
+        ],
+        "certifications": [
+            "SBA Certified Development Company (CDC)",
+            "U.S. Treasury Certified CDFI"
+        ],
+        "positioning": [
+            "Nation’s first faith-based SBA 504 lender",
+            "Mission-driven community lender",
+            "Focus on underserved entrepreneurs"
+        ]
+    },
+    "mission_vision": {
+        "mission": "Provide access to capital and resources that uplift communities and empower entrepreneurs",
+        "vision": "Uplift Communities, Strengthen Families, Advance Entrepreneurial Dreams",
+        "values": [
+            "Economic inclusion",
+            "Community development",
+            "Entrepreneur mentorship",
+            "Faith-informed service"
+        ]
+    },
+    "financial_products": {
+        "sba_504": {
+            "use_cases": [
+                "Commercial real estate purchase",
+                "New construction",
+                "Expansion",
+                "Refinancing",
+                "Heavy equipment purchase"
+            ],
+            "structure": {
+                "bank_first_mortgage": "50%",
+                "sba_cdc_portion": "Up to 40%",
+                "borrower_down_payment": "As low as 10%"
+            },
+            "terms": {
+                "interest": "Fixed, below market",
+                "amortization_years": [
+                    10,
+                    20,
+                    25
+                ]
+            },
+            "occupancy_requirement": {
+                "existing_building": "51%",
+                "new_construction": "60%"
+            }
+        },
+        "sba_7a": {
+            "max_amount": 350000,
+            "use_cases": [
+                "Working capital",
+                "Business acquisition",
+                "Equipment",
+                "General operations"
+            ],
+            "features": [
+                "Flexible use",
+                "No prepayment penalty on non-real-estate loans"
+            ]
+        },
+        "microloan": {
+            "max_amount": 50000,
+            "term_years": 7,
+            "interest": "Fixed",
+            "intended_for": [
+                "Startups",
+                "Early-stage businesses",
+                "Small working capital needs"
+            ]
+        },
+        "down_payment_assistance": {
+            "target_groups": [
+                "Black-owned businesses",
+                "Latino-owned businesses",
+                "Women-led businesses"
+            ],
+            "availability": "California",
+            "max_assistance": 100000,
+            "coverage": "Up to 50% of down payment",
+            "structure": {
+                "amortization_years": 10,
+                "balloon_due_years": 5
+            }
+        },
+        "first_time_buyer_program": {
+            "description": "Helps first-time owner-occupied commercial real estate buyers with down payment support",
+            "linked_programs": [
+                "Down Payment Assistance"
+            ]
+        }
+    },
+    "eligibility_criteria": {
+        "entity_requirements": {
+            "for_profit": true,
+            "ownership": "100% U.S. citizen or legal permanent resident"
+        },
+        "sba_size_tests": {
+            "net_worth_max": 20000000,
+            "avg_net_income_max": 6500000
+        },
+        "documentation_required": [
+            "Business tax returns",
+            "Personal tax returns",
+            "Financial statements",
+            "Bank statements",
+            "AR/AP aging",
+            "Business plan or projections (if startup)"
+        ]
+    },
+    "process_flow": [
+        "Initial inquiry or application",
+        "Assignment to Business Champion",
+        "Document collection and underwriting",
+        "SBA / lending approval",
+        "Loan closing"
+    ],
+    "support_ecosystem": {
+        "non_financial_support": [
+            "Mentorship",
+            "Business coaching",
+            "Entrepreneur ecosystem access",
+            "Community networking"
+        ],
+        "positioning": "Capital plus capability building"
+    },
+    "impact_metrics": {
+        "total_funding_deployed_usd": 2000000000,
+        "businesses_served": 2000,
+        "jobs_created_or_preserved": 15000
+    },
+    "constraints_and_limits": {
+        "not_supported": [
+            "Non-U.S.-owned businesses",
+            "Businesses exceeding SBA size limits"
+        ],
+        "tradeoffs": [
+            "High documentation burden",
+            "Regulated SBA timelines",
+            "Mission-driven underwriting standards"
+        ]
+    },
+    "contact": {
+        "phone_numbers": [
+            "909-915-1706",
+            "909-752-3140"
+        ],
+        "contact_page": "https://ampac.com/contact"
+    },
+    "llm_usage_notes": {
+        "recommended_tone": "Supportive, compliance-aware, educator",
+        "key_keywords": [
+            "SBA 504",
+            "CDFI",
+            "Community lender",
+            "Down payment assistance",
+            "Underserved entrepreneurs",
+            "Owner-occupied real estate"
+        ],
+        "common_user_intents": [
+            "Do I qualify?",
+            "How much down payment do I need?",
+            "Which SBA program fits me?",
+            "What documents are required?",
+            "How long does approval take?"
+        ]
+    }
+}

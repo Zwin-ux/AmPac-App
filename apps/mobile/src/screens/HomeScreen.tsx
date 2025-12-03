@@ -3,7 +3,7 @@ import { Image, ScrollView, StyleSheet, Text, View, TouchableOpacity } from 'rea
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import AssistantBubble from '../components/AssistantBubble';
+import SmartActionBar from '../components/SmartActionBar';
 import OfflineBanner from '../components/OfflineBanner';
 import { userStore } from '../services/userStore';
 import { applicationStore } from '../services/applicationStore';
@@ -18,13 +18,9 @@ export default function HomeScreen() {
     const [activeApplication, setActiveApplication] = useState<Application | null>(null);
     const navigation = useNavigation<any>();
 
+    // 1. Subscription & Hydration (Run once)
     useEffect(() => {
         const unsubscribeUser = userStore.subscribe(setUser);
-        const unsubscribeApp = applicationStore.subscribe((apps) => {
-            // Find the most relevant active application
-            const active = apps.find(a => a.status !== 'withdrawn' && a.status !== 'declined') || null;
-            setActiveApplication(active);
-        });
 
         const hydrate = async () => {
             await userStore.hydrateFromStorage();
@@ -36,9 +32,24 @@ export default function HomeScreen() {
 
         return () => {
             unsubscribeUser();
-            unsubscribeApp();
         };
     }, []);
+
+    // 2. Fetch Applications (Run when user changes)
+    useEffect(() => {
+        const fetchApps = async () => {
+            if (user?.uid) {
+                const { getUserApplications } = await import('../services/applications');
+                const apps = await getUserApplications(user.uid);
+                const active = apps.find(a => a.status !== 'withdrawn' && a.status !== 'declined') || null;
+                setActiveApplication(active);
+            }
+        };
+
+        if (user?.uid) {
+            fetchApps();
+        }
+    }, [user?.uid]); // Only depend on UID to avoid deep object comparison issues
 
     const userName = user?.fullName?.split(' ')[0] || 'Entrepreneur';
 
@@ -47,7 +58,11 @@ export default function HomeScreen() {
             <OfflineBanner />
             <View style={styles.header}>
                 <View>
-                    <Text style={styles.headerTitle}>AmPac</Text>
+                    <Image
+                        source={require('../../assets/ampac_logo.png')}
+                        style={{ width: 100, height: 30, marginBottom: 4 }}
+                        resizeMode="contain"
+                    />
                     <Text style={styles.welcomeText}>Good afternoon, {userName}</Text>
                 </View>
                 <TouchableOpacity style={styles.profileButton} onPress={() => navigation.navigate('Profile')}>
@@ -60,9 +75,9 @@ export default function HomeScreen() {
                 {activeApplication ? (
                     <View style={{ marginBottom: theme.spacing.xl }}>
                         <Text style={styles.sectionTitle}>LOAN STATUS</Text>
-                        <LoanStatusTracker 
-                            status={activeApplication.status} 
-                            venturesStatus={activeApplication.venturesStatus} 
+                        <LoanStatusTracker
+                            status={activeApplication.status}
+                            venturesStatus={activeApplication.venturesStatus}
                         />
                     </View>
                 ) : (
@@ -87,61 +102,55 @@ export default function HomeScreen() {
                     )
                 )}
 
-                <Text style={styles.sectionTitle}>Quick Actions</Text>
+                <Text style={styles.sectionTitle}>Tools & Services</Text>
 
                 <View style={styles.quickActionsGrid}>
-                    <Card style={styles.actionCard}>
-                        <TouchableOpacity onPress={() => navigation.navigate('Support')} style={styles.actionTouch}>
-                            <View style={styles.iconContainer}>
-                                <Ionicons name="chatbox-ellipses" size={20} color={theme.colors.text} />
-                            </View>
-                            <View>
-                                <Text style={styles.actionTitle}>Support</Text>
-                                <Text style={styles.actionDescription}>Talk to an expert</Text>
-                            </View>
-                        </TouchableOpacity>
-                    </Card>
+                    <TouchableOpacity
+                        style={styles.actionCard}
+                        onPress={() => navigation.navigate('Support')}
+                    >
+                        <View style={[styles.iconContainer, { backgroundColor: '#E3F2FD' }]}>
+                            <Ionicons name="chatbox-ellipses" size={24} color="#1565C0" />
+                        </View>
+                        <Text style={styles.actionLabel}>Support</Text>
+                    </TouchableOpacity>
 
-                    <Card style={styles.actionCard}>
-                        <TouchableOpacity onPress={() => navigation.navigate('Spaces')} style={styles.actionTouch}>
-                            <View style={styles.iconContainer}>
-                                <Ionicons name="calendar" size={20} color={theme.colors.text} />
-                            </View>
-                            <View>
-                                <Text style={styles.actionTitle}>Book Space</Text>
-                                <Text style={styles.actionDescription}>Reserve a room</Text>
-                            </View>
-                        </TouchableOpacity>
-                    </Card>
+                    <TouchableOpacity
+                        style={styles.actionCard}
+                        onPress={() => navigation.navigate('Spaces')}
+                    >
+                        <View style={[styles.iconContainer, { backgroundColor: '#E8F5E9' }]}>
+                            <Ionicons name="calendar" size={24} color="#2E7D32" />
+                        </View>
+                        <Text style={styles.actionLabel}>Book Space</Text>
+                    </TouchableOpacity>
 
-                    <Card style={styles.fullWidthCard}>
-                        <TouchableOpacity onPress={() => navigation.navigate('WebsiteBuilder')} style={styles.rowAction}>
-                            <View style={styles.iconContainer}>
-                                <Ionicons name="globe-outline" size={20} color={theme.colors.text} />
-                            </View>
-                            <View style={styles.rowContent}>
-                                <Text style={styles.actionTitle}>Website Builder</Text>
-                                <Text style={styles.actionDescription}>Create a professional site in seconds</Text>
-                            </View>
-                            <Ionicons name="arrow-forward" size={20} color={theme.colors.textSecondary} />
-                        </TouchableOpacity>
-                    </Card>
+                    <TouchableOpacity
+                        style={styles.actionCard}
+                        onPress={() => navigation.navigate('WebsiteBuilder')}
+                    >
+                        <View style={[styles.iconContainer, { backgroundColor: '#FFF3E0' }]}>
+                            <Ionicons name="globe-outline" size={24} color="#EF6C00" />
+                        </View>
+                        <Text style={styles.actionLabel}>Web Builder</Text>
+                    </TouchableOpacity>
 
-                    <Card style={styles.fullWidthCard}>
-                        <TouchableOpacity onPress={() => navigation.navigate('Network')} style={styles.rowAction}>
-                            <View style={styles.iconContainer}>
-                                <Ionicons name="people" size={20} color={theme.colors.text} />
-                            </View>
-                            <View style={styles.rowContent}>
-                                <Text style={styles.actionTitle}>Entrepreneur Ecosystem</Text>
-                                <Text style={styles.actionDescription}>Connect with the community</Text>
-                            </View>
-                            <Ionicons name="arrow-forward" size={20} color={theme.colors.textSecondary} />
-                        </TouchableOpacity>
-                    </Card>
+                    <TouchableOpacity
+                        style={styles.actionCard}
+                        onPress={() => navigation.navigate('Network')}
+                    >
+                        <View style={[styles.iconContainer, { backgroundColor: '#F3E5F5' }]}>
+                            <Ionicons name="people" size={24} color="#7B1FA2" />
+                        </View>
+                        <Text style={styles.actionLabel}>Network</Text>
+                    </TouchableOpacity>
                 </View>
+
+                {/* Spacer for SmartActionBar */}
+                <View style={{ height: 100 }} />
             </ScrollView>
-            <AssistantBubble context="home" />
+
+            <SmartActionBar context="home" />
         </SafeAreaView>
     );
 }
@@ -288,12 +297,12 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
     },
     iconContainer: {
-        width: 40,
-        height: 40,
+        width: 36,
+        height: 36,
         borderRadius: theme.borderRadius.md,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: theme.spacing.lg,
+        marginBottom: theme.spacing.md,
         borderWidth: 1,
         borderColor: theme.colors.border,
         backgroundColor: theme.colors.surfaceHighlight,
@@ -313,5 +322,32 @@ const styles = StyleSheet.create({
     rowContent: {
         flex: 1,
         marginLeft: theme.spacing.md,
+    },
+    horizontalScroll: {
+        paddingHorizontal: theme.spacing.lg, // Align with header
+        paddingBottom: theme.spacing.md,
+        gap: theme.spacing.md,
+    },
+    horizontalCard: {
+        width: 110,
+        height: 110,
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.borderRadius.lg,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        marginRight: theme.spacing.md,
+        ...theme.shadows.subtle,
+    },
+    horizontalTouch: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: theme.spacing.md,
+    },
+    horizontalTitle: {
+        ...theme.typography.label as any,
+        marginTop: theme.spacing.sm,
+        textAlign: 'center',
+        color: theme.colors.text,
     },
 });

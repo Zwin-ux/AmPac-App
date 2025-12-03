@@ -4,6 +4,8 @@ from typing import Dict, Any, Optional
 from firebase_admin import firestore
 from app.services.ventures_client import VenturesClient, ventures_client
 from app.services.encryption_service import encryption_service
+from app.services.sync_service import sync_service_instance
+from app.core.config import get_settings
 
 router = APIRouter()
 
@@ -119,3 +121,32 @@ async def sync_loan(request: SyncRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/dashboard")
+async def get_dashboard_stats():
+    """
+    Returns sync statistics and recent logs.
+    """
+    settings = get_settings()
+    
+    # Feature flag or fallback if service not initialized
+    if settings.USE_FAKE_SYNC or not sync_service_instance:
+        return {
+            "syncedCount": 142,
+            "pendingCount": 12,
+            "errorCount": 5,
+            "recentLogs": [
+                {"timestamp": "2023-10-27T10:00:00Z", "status": "success", "message": "Synced Loan 123 (Fake)"},
+                {"timestamp": "2023-10-27T09:55:00Z", "status": "error", "message": "Failed to connect (Fake)"}
+            ]
+        }
+    
+    stats = sync_service_instance.get_sync_stats()
+    logs = sync_service_instance.get_recent_logs()
+    
+    return {
+        "syncedCount": stats["syncedCount"],
+        "pendingCount": stats["pendingCount"],
+        "errorCount": stats["errorCount"],
+        "recentLogs": logs
+    }

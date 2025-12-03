@@ -76,6 +76,7 @@ export interface User {
     website?: string;
     city?: string;
     email?: string;
+    notificationsEnabled?: boolean;
 }
 
 export interface LoanProduct {
@@ -179,6 +180,10 @@ export interface Document {
     version?: number;
     virusScanStatus?: 'pending' | 'clean' | 'infected';
     classificationTags?: string[];
+
+    // IDP Fields
+    analysisStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+    extractedData?: Record<string, any>;
 }
 
 export interface Task {

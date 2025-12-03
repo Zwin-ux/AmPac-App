@@ -75,6 +75,7 @@ export interface User {
     linkedinUrl?: string;
     website?: string;
     city?: string;
+    permissions?: string[]; // RBAC: List of specific capabilities e.g. 'approve_loan', 'view_sensitive_pii'
 }
 
 export interface LoanProduct {
@@ -256,4 +257,17 @@ export interface VenturesLoanStatus {
     status: 'connected' | 'disconnected' | 'error';
     fieldMappings: VenturesFieldMapping[];
     syncLogs: VenturesSyncLog[];
+}
+
+export interface VenturesDashboardLog {
+    timestamp: string;
+    status: 'success' | 'error';
+    message: string;
+}
+
+export interface VenturesDashboardStats {
+    syncedCount: number;
+    pendingCount: number;
+    errorCount: number;
+    recentLogs: VenturesDashboardLog[];
 }

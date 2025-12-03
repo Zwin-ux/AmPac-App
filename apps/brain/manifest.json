@@ -1,0 +1,43 @@
+{
+    "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
+    "manifestVersion": "1.16",
+    "version": "1.0.2",
+    "id": "53785a80-305a-4461-b34a-f9d615c65029",
+    "packageName": "com.ampac.brain",
+    "developer": {
+        "name": "AmPac Business Capital",
+        "websiteUrl": "https://ampac.com",
+        "privacyUrl": "https://ampac.com/privacy",
+        "termsOfUseUrl": "https://ampac.com/terms"
+    },
+    "icons": {
+        "color": "color.png",
+        "outline": "outline.png"
+    },
+    "name": {
+        "short": "AmPac Brain",
+        "full": "AmPac Brain: AI Underwriter"
+    },
+    "description": {
+        "short": "24/7 AI Underwriter for SBA Lending",
+        "full": "AmPac Brain is your always-on AI underwriter. It screens deals from emails, extracts financial data, checks SBA eligibility (504/7a), and drafts missing document requests instantly."
+    },
+    "accentColor": "#0078d4",
+    "staticTabs": [
+        {
+            "entityId": "brain-tab",
+            "name": "Brain",
+            "contentUrl": "https://brain-service-952649324958.us-central1.run.app/static/m365/taskpane.html",
+            "websiteUrl": "https://brain-service-952649324958.us-central1.run.app/static/m365/taskpane.html",
+            "scopes": [
+                "personal"
+            ]
+        }
+    ],
+    "permissions": [
+        "identity"
+    ],
+    "validDomains": [
+        "brain-service-952649324958.us-central1.run.app"
+    ]
+}

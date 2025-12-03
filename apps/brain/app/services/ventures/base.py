@@ -24,6 +24,10 @@ class AbstractVenturesClient(ABC):
         pass
 
     @abstractmethod
+    async def get_all_loans(self) -> List[VenturesLoan]:
+        pass
+
+    @abstractmethod
     async def get_conditions(self, loan_id: str) -> List[VenturesCondition]:
         pass
 

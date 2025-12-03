@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, Share, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, Share, TouchableOpacity, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../theme';
 import { auth, db } from '../../firebaseConfig';
@@ -7,7 +7,7 @@ import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestor
 import { flushPendingApplicationWrites } from '../services/applications';
 import { applicationStore, ApplicationStoreState } from '../services/applicationStore';
 import { Application, SyncStatus, Task } from '../types';
-import AssistantBubble from '../components/AssistantBubble';
+
 import SyncStatusBadge from '../components/SyncStatusBadge';
 import QuickApplySheet from '../components/QuickApplySheet';
 import { useNavigation } from '@react-navigation/native';
@@ -91,7 +91,9 @@ export default function ApplicationScreen() {
             setLastSyncedAt(state.lastSyncedAt);
 
             if (state.draft) {
-                setCurrentStep(state.draft.currentStep ?? currentStep);
+                // Use functional update or ignore stale currentStep
+                setCurrentStep(prev => state.draft?.currentStep ?? prev);
+
                 if (state.draft.data?.documents) {
                     setDocuments((state.draft.data.documents as DocumentRequirement[]).map(doc => ({
                         ...doc,
@@ -106,28 +108,7 @@ export default function ApplicationScreen() {
         });
 
         return unsubscribe;
-    }, [currentStep]);
-
-    // Subscribe to tasks
-    useEffect(() => {
-        if (!application?.id) return;
-
-        const q = query(
-            collection(db, 'tasks'),
-            where('loanApplicationId', '==', application.id),
-            orderBy('createdAt', 'desc')
-        );
-
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const fetchedTasks = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            })) as Task[];
-            setTasks(fetchedTasks);
-        });
-
-        return () => unsubscribe();
-    }, [application?.id]);
+    }, []); // Remove currentStep dependency to avoid re-subscribing and resetting state
 
     const refreshTasks = async () => {
         // In a real app, this might trigger a cloud function to sync tasks from Ventures
@@ -218,12 +199,45 @@ export default function ApplicationScreen() {
 
             // INSTANT: Move to step 1
             setCurrentStep(1);
+
+            // Sync to store if we have a draft
+            if (application) {
+                applicationStore.setStep(1);
+            }
             return;
         }
 
         if (!application) {
             Alert.alert("Start Application", "Please pick a loan product to continue.");
             return;
+        }
+
+        if (currentStep === 1 && application) {
+            // Validate Business Info
+            if (!application.businessName?.trim()) {
+                Alert.alert("Required", "Please enter your Legal Business Name.");
+                return;
+            }
+            if (!application.yearsInBusiness || application.yearsInBusiness <= 0) {
+                Alert.alert("Required", "Please enter valid Years in Business.");
+                return;
+            }
+            if (!application.annualRevenue || application.annualRevenue <= 0) {
+                Alert.alert("Required", "Please enter valid Annual Revenue.");
+                return;
+            }
+        }
+
+        if (currentStep === 2) {
+            // Validate Loan Details
+            if (!application?.loanAmount || application.loanAmount <= 0) {
+                Alert.alert("Required", "Please enter a valid Loan Amount.");
+                return;
+            }
+            if (!application?.useOfFunds?.trim()) {
+                Alert.alert("Required", "Please describe the Use of Funds.");
+                return;
+            }
         }
 
         const nextStep = Math.min(currentStep + 1, TOTAL_FORM_STEPS);
@@ -279,7 +293,7 @@ export default function ApplicationScreen() {
                 docId,
                 fileName: picked.name
             });
-            
+
             const uploadResult = await uploadFileFromUri({
                 uri: picked.uri,
                 path,
@@ -306,6 +320,32 @@ export default function ApplicationScreen() {
                 applicationStore.updateFields({
                     data: { ...(application.data || {}), documents: updatedDocs },
                 });
+
+                // Trigger Brain Analysis
+                try {
+                    const { getAuth } = await import('firebase/auth');
+                    const { API_URL } = await import('../config');
+                    const token = await getAuth().currentUser?.getIdToken();
+
+                    if (token) {
+                        fetch(`${API_URL}/documents/analyze`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                            },
+                            body: JSON.stringify({
+                                documentId: docId,
+                                fileName: picked.name,
+                                content: uploadResult.downloadUrl
+                            })
+                        }).then(() => {
+                            Alert.alert("Analysis Started", "The Brain is processing your document to extract key info.");
+                        }).catch(err => console.error("Analysis trigger failed", err));
+                    }
+                } catch (err) {
+                    console.error("Analysis trigger setup failed", err);
+                }
             }
         } catch (error) {
             console.error("Upload failed", error);
@@ -320,17 +360,16 @@ export default function ApplicationScreen() {
     const handleSubmit = async () => {
         if (!application) return;
 
-        // Flush any pending saves before submit
-        await flushSave();
-
-        // Update status to submitted
-        applicationStore.updateField('status', 'submitted');
-
-        Alert.alert(
-            "Application submitted",
-            "Your application has been received. A loan officer will review it shortly.",
-            [{ text: "Back to Home", onPress: () => navigation.navigate('Home') }]
-        );
+        try {
+            await applicationStore.submit();
+            Alert.alert(
+                "Application Submitted!",
+                "Your application has been received. A loan officer will review it shortly.",
+                [{ text: "Back to Home", onPress: () => navigation.navigate('Home') }]
+            );
+        } catch (error) {
+            Alert.alert("Submission Failed", "Please try again later.");
+        }
     };
 
     // Step 0: Eligibility
@@ -374,45 +413,59 @@ export default function ApplicationScreen() {
     // Simplified: If no app, show selection. If app, show Business Info.
     const renderProductSelection = () => (
         <View style={styles.content}>
-            <Text style={styles.title}>Select a Loan Product</Text>
-            <Text style={styles.subtitle}>Based on your needs.</Text>
+            <Text style={styles.title}>Select Loan Product</Text>
+            <Text style={styles.subtitle}>Choose the financing that fits your goals.</Text>
 
             {/* Quick Apply CTA */}
             <TouchableOpacity style={styles.quickApplyBanner} onPress={() => setShowQuickApply(true)}>
-                <View style={styles.quickApplyContent}>
-                    <Ionicons name="flash" size={24} color={theme.colors.success} />
-                    <View style={styles.quickApplyText}>
-                        <Text style={styles.quickApplyTitle}>Quick Apply</Text>
-                        <Text style={styles.quickApplyDesc}>Submit in 30 seconds, complete details later</Text>
-                    </View>
+                <View style={styles.quickApplyIcon}>
+                    <Ionicons name="flash" size={20} color="white" />
+                </View>
+                <View style={styles.quickApplyText}>
+                    <Text style={styles.quickApplyTitle}>Quick Apply</Text>
+                    <Text style={styles.quickApplyDesc}>Get started in 30 seconds</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={theme.colors.success} />
             </TouchableOpacity>
 
-            <Text style={styles.orDivider}>— or choose a loan type —</Text>
+            <Text style={styles.orDivider}>AVAILABLE PRODUCTS</Text>
 
-            <TouchableOpacity style={styles.card} onPress={() => handleStartNew('sba_504')}>
-                <View style={styles.cardHeader}>
-                    <Text style={styles.cardTitle}>SBA 504 Loan</Text>
-                    <Ionicons name="business" size={24} color={theme.colors.primary} />
+            <TouchableOpacity style={styles.productCard} onPress={() => handleStartNew('sba_504')}>
+                <View style={styles.productIcon}>
+                    <Ionicons name="business" size={28} color={theme.colors.primary} />
                 </View>
-                <Text style={styles.cardDesc}>Best for purchasing major fixed assets like real estate or equipment.</Text>
+                <View style={styles.productInfo}>
+                    <Text style={styles.productTitle}>SBA 504 Loan</Text>
+                    <Text style={styles.productDesc}>Fixed assets, real estate, and equipment.</Text>
+                    <View style={styles.productTag}>
+                        <Text style={styles.productTagText}>POPULAR</Text>
+                    </View>
+                </View>
+                <Ionicons name="arrow-forward" size={20} color={theme.colors.border} />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.card} onPress={() => handleStartNew('sba_7a')}>
-                <View style={styles.cardHeader}>
-                    <Text style={styles.cardTitle}>SBA 7(a) Loan</Text>
-                    <Ionicons name="cash" size={24} color={theme.colors.primary} />
+            <TouchableOpacity style={styles.productCard} onPress={() => handleStartNew('sba_7a')}>
+                <View style={styles.productIcon}>
+                    <Ionicons name="cash" size={28} color={theme.colors.primary} />
                 </View>
-                <Text style={styles.cardDesc}>Flexible funding for working capital, debt refinancing, and more.</Text>
+                <View style={styles.productInfo}>
+                    <Text style={styles.productTitle}>SBA 7(a) Loan</Text>
+                    <Text style={styles.productDesc}>Working capital and debt refinancing.</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={20} color={theme.colors.border} />
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.card, { opacity: 0.7 }]} onPress={() => Alert.alert("Coming Soon", "Community Lending applications will be available soon!")}>
-                <View style={styles.cardHeader}>
-                    <Text style={styles.cardTitle}>Community Lending</Text>
-                    <Ionicons name="people" size={24} color={theme.colors.secondary} />
+            <TouchableOpacity style={[styles.productCard, styles.productCardDisabled]} onPress={() => Alert.alert("Coming Soon", "Community Lending applications will be available soon!")}>
+                <View style={[styles.productIcon, { backgroundColor: '#F3F4F6' }]}>
+                    <Ionicons name="people" size={28} color={theme.colors.textSecondary} />
                 </View>
-                <Text style={styles.cardDesc}>Microloans and smaller capital needs for growing businesses.</Text>
+                <View style={styles.productInfo}>
+                    <Text style={[styles.productTitle, { color: theme.colors.textSecondary }]}>Community Lending</Text>
+                    <Text style={styles.productDesc}>Microloans for small businesses.</Text>
+                    <View style={styles.comingSoonTag}>
+                        <Text style={styles.comingSoonText}>SOON</Text>
+                    </View>
+                </View>
             </TouchableOpacity>
         </View>
     );
@@ -577,18 +630,42 @@ export default function ApplicationScreen() {
         </View>
     );
 
-    const renderProgressBar = () => {
+    const renderStepIndicator = () => {
         if (currentStep === 0) return null;
-        const progress = (currentStep / TOTAL_FORM_STEPS) * 100;
+        const steps = ['Info', 'Loan', 'Docs', 'Review'];
         return (
-            <View style={styles.progressContainer}>
-                <View style={styles.progressBarBackground}>
-                    <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
-                </View>
-                <Text style={styles.stepText}>Step {currentStep} of {TOTAL_FORM_STEPS}</Text>
+            <View style={styles.stepIndicatorContainer}>
+                {steps.map((label, index) => {
+                    const stepNum = index + 1;
+                    const isActive = stepNum === currentStep;
+                    const isCompleted = stepNum < currentStep;
+                    return (
+                        <View key={index} style={styles.stepItem}>
+                            <View style={[
+                                styles.stepCircle,
+                                isActive && styles.stepCircleActive,
+                                isCompleted && styles.stepCircleCompleted
+                            ]}>
+                                {isCompleted ? (
+                                    <Ionicons name="checkmark" size={12} color="white" />
+                                ) : (
+                                    <Text style={[styles.stepNumber, isActive && styles.stepNumberActive]}>{stepNum}</Text>
+                                )}
+                            </View>
+                            <Text style={[styles.stepLabel, isActive && styles.stepLabelActive]}>{label}</Text>
+                            {index < steps.length - 1 && (
+                                <View style={[styles.stepLine, isCompleted && styles.stepLineCompleted]} />
+                            )}
+                        </View>
+                    );
+                })}
             </View>
         );
     };
+
+    // ... inside render ...
+    // Replace renderProgressBar() with renderStepIndicator()
+
 
     const renderPerformanceStrip = () => (
         <View style={styles.metaStrip}>
@@ -641,11 +718,13 @@ export default function ApplicationScreen() {
                     <Text style={styles.backButtonText}>Back</Text>
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Loan Application</Text>
-                <View style={{ width: 60 }} />
+                <TouchableOpacity onPress={flushSave} style={styles.saveButton}>
+                    <Text style={styles.saveButtonText}>Save Draft</Text>
+                </TouchableOpacity>
             </View>
 
             {renderPerformanceStrip()}
-            {renderProgressBar()}
+            {renderStepIndicator()}
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 {currentStep === 0 && renderEligibility()}
@@ -682,7 +761,7 @@ export default function ApplicationScreen() {
                     )}
                 </View>
             )}
-            <AssistantBubble context="application" />
+
 
             {/* Quick Apply Sheet */}
             <QuickApplySheet
@@ -713,20 +792,28 @@ const styles = StyleSheet.create({
         padding: theme.spacing.lg,
     },
     title: {
-        ...theme.typography.h1,
+        fontSize: 24,
+        fontWeight: '700',
+        color: theme.colors.text,
+        letterSpacing: -0.5,
+        lineHeight: 32,
         marginBottom: theme.spacing.xs,
     },
     subtitle: {
-        ...theme.typography.body,
+        fontSize: 15,
         color: theme.colors.textSecondary,
+        lineHeight: 22,
         marginBottom: theme.spacing.xl,
     },
     card: {
         backgroundColor: theme.colors.surface,
         padding: theme.spacing.lg,
-        borderRadius: theme.borderRadius.lg,
+        borderRadius: 8, // Sharper corners
         marginBottom: theme.spacing.md,
-        ...theme.shadows.card,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        // Flat design - no shadow
+        shadowColor: 'transparent',
     },
     cardHeader: {
         flexDirection: 'row',
@@ -738,6 +825,7 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
         color: theme.colors.primary,
+        letterSpacing: -0.5,
     },
     cardDesc: {
         fontSize: 14,
@@ -754,9 +842,10 @@ const styles = StyleSheet.create({
         borderBottomColor: theme.colors.border,
     },
     headerTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
+        fontSize: 16, // Smaller, tighter header
+        fontWeight: '700',
         color: theme.colors.text,
+        letterSpacing: -0.3,
     },
     backButton: {
         padding: theme.spacing.sm,
@@ -765,60 +854,200 @@ const styles = StyleSheet.create({
     },
     backButtonText: {
         color: theme.colors.primary,
-        fontSize: 16,
+        fontSize: 14,
         marginLeft: 4,
         fontWeight: '600',
     },
+    saveButton: {
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        backgroundColor: theme.colors.surfaceHighlight,
+        borderRadius: 4, // Sharper
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+    },
+    saveButtonText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: theme.colors.text,
+    },
+
+    stepIndicatorContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: theme.spacing.md,
+        backgroundColor: theme.colors.background,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.colors.border,
+    },
+    stepItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    stepCircle: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: theme.colors.surface,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+    },
+    stepCircleActive: {
+        backgroundColor: theme.colors.text,
+        borderColor: theme.colors.text,
+    },
+    stepCircleCompleted: {
+        backgroundColor: theme.colors.success,
+        borderColor: theme.colors.success,
+    },
+    stepNumber: {
+        fontSize: 10,
+        color: theme.colors.textSecondary,
+        fontWeight: '600',
+    },
+    stepNumberActive: {
+        color: 'white',
+    },
+    stepLabel: {
+        fontSize: 11,
+        color: theme.colors.textSecondary,
+        marginLeft: 6,
+        marginRight: 6,
+        fontWeight: '500',
+        letterSpacing: -0.2,
+    },
+    stepLabelActive: {
+        color: theme.colors.text,
+        fontWeight: '700',
+    },
+    stepLine: {
+        width: 24,
+        height: 1,
+        backgroundColor: theme.colors.border,
+        marginRight: 6,
+    },
+    stepLineCompleted: {
+        backgroundColor: theme.colors.success,
+    },
+
+    productCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: theme.colors.surface,
+        padding: theme.spacing.lg,
+        borderRadius: 8, // Sharper
+        marginBottom: theme.spacing.md,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+    },
+    productCardDisabled: {
+        opacity: 0.6,
+        backgroundColor: '#F9FAFB',
+    },
+    productIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 6, // Square-ish
+        backgroundColor: '#F3F4F6',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: theme.spacing.md,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+    },
+    productInfo: {
+        flex: 1,
+    },
+    productTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: theme.colors.text,
+        marginBottom: 2,
+        letterSpacing: -0.3,
+    },
+    productDesc: {
+        fontSize: 13,
+        color: theme.colors.textSecondary,
+        lineHeight: 18,
+    },
+    productTag: {
+        backgroundColor: theme.colors.text, // Black tag
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 2,
+        alignSelf: 'flex-start',
+        marginTop: 6,
+    },
+    productTagText: {
+        fontSize: 10,
+        fontWeight: 'bold',
+        color: 'white',
+        textTransform: 'uppercase',
+    },
+    comingSoonTag: {
+        backgroundColor: '#F3F4F6',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 2,
+        alignSelf: 'flex-start',
+        marginTop: 6,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+    },
+    comingSoonText: {
+        fontSize: 10,
+        fontWeight: 'bold',
+        color: theme.colors.textSecondary,
+        textTransform: 'uppercase',
+    },
     metaStrip: {
-        paddingHorizontal: theme.spacing.lg,
-        paddingTop: theme.spacing.md,
         backgroundColor: theme.colors.background,
         flexDirection: 'row',
         justifyContent: 'space-between',
         flexWrap: 'wrap',
-        rowGap: theme.spacing.sm,
+        paddingHorizontal: theme.spacing.lg,
+        paddingVertical: theme.spacing.sm,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.colors.border,
     },
     metaCard: {
-        flex: 1,
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.borderRadius.md,
-        padding: theme.spacing.md,
-        marginRight: theme.spacing.sm,
         flexDirection: 'row',
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-        marginBottom: theme.spacing.sm,
+        marginRight: theme.spacing.md,
     },
     metaCardBody: {
-        marginLeft: theme.spacing.sm,
-        flex: 1,
+        marginLeft: theme.spacing.xs,
     },
     metaLabel: {
-        fontSize: 12,
+        fontSize: 10,
         color: theme.colors.textSecondary,
-        marginBottom: 2,
+        textTransform: 'uppercase',
+        fontWeight: '600',
     },
     metaValue: {
-        fontSize: 14,
+        fontSize: 12,
         color: theme.colors.text,
         fontWeight: '600',
+        fontFamily: Platform.select({ ios: 'Courier', android: 'monospace' }), // Monospace for data
     },
     progressContainer: {
         padding: theme.spacing.lg,
         backgroundColor: theme.colors.surface,
     },
     progressBarBackground: {
-        height: 8,
+        height: 4,
         backgroundColor: theme.colors.border,
-        borderRadius: 4,
+        borderRadius: 2,
         marginBottom: theme.spacing.xs,
         overflow: 'hidden',
     },
     progressBarFill: {
         height: '100%',
-        backgroundColor: theme.colors.success,
-        borderRadius: 4,
+        backgroundColor: theme.colors.text, // Black progress bar
+        borderRadius: 2,
     },
     stepText: {
         textAlign: 'right',
@@ -831,29 +1060,37 @@ const styles = StyleSheet.create({
     stepContainer: {
         backgroundColor: theme.colors.surface,
         padding: theme.spacing.xl,
-        borderRadius: theme.borderRadius.lg,
-        ...theme.shadows.card,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
     },
     stepTitle: {
-        ...theme.typography.h2,
+        fontSize: 18,
+        fontWeight: '700',
+        color: theme.colors.text,
+        letterSpacing: -0.5,
         marginBottom: theme.spacing.xs,
+        textTransform: 'uppercase',
     },
     stepDescription: {
         fontSize: 14,
         color: theme.colors.textSecondary,
         marginBottom: theme.spacing.xl,
+        lineHeight: 20,
     },
     label: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: theme.colors.text,
+        fontSize: 12,
+        fontWeight: '700',
+        color: theme.colors.textSecondary,
         marginBottom: theme.spacing.xs,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     eligibilityBanner: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#e8f5e9',
-        borderRadius: theme.borderRadius.md,
+        backgroundColor: '#F0FDF4',
+        borderRadius: 4,
         padding: theme.spacing.md,
         marginTop: theme.spacing.sm,
         borderWidth: 1,
@@ -863,6 +1100,7 @@ const styles = StyleSheet.create({
         marginLeft: theme.spacing.sm,
         color: theme.colors.text,
         flex: 1,
+        fontSize: 13,
     },
     footer: {
         padding: theme.spacing.lg,
@@ -875,7 +1113,7 @@ const styles = StyleSheet.create({
     reviewCard: {
         backgroundColor: theme.colors.background,
         padding: theme.spacing.md,
-        borderRadius: theme.borderRadius.md,
+        borderRadius: 4,
         borderWidth: 1,
         borderColor: theme.colors.border,
     },
@@ -884,6 +1122,11 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: theme.spacing.sm,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        borderRadius: 4,
+        backgroundColor: theme.colors.surface,
     },
     docInfo: {
         flexDirection: 'row',
@@ -904,28 +1147,36 @@ const styles = StyleSheet.create({
         color: theme.colors.textSecondary,
     },
     docUrl: {
-        fontSize: 11,
-        color: theme.colors.info,
+        fontSize: 10,
+        color: theme.colors.primary,
         marginTop: 2,
+        fontFamily: Platform.select({ ios: 'Courier', android: 'monospace' }),
     },
     microCopy: {
-        fontSize: 12,
+        fontSize: 11,
         color: theme.colors.textSecondary,
         marginTop: theme.spacing.sm,
+        textAlign: 'center',
     },
     handoffCard: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         marginTop: theme.spacing.md,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        borderRadius: 4,
+        backgroundColor: '#F9FAFB',
     },
     handoffTitle: {
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: '700',
         color: theme.colors.text,
+        textTransform: 'uppercase',
     },
     handoffHint: {
-        fontSize: 12,
+        fontSize: 11,
         color: theme.colors.textSecondary,
         marginTop: 4,
     },
@@ -933,15 +1184,16 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: theme.colors.primary,
         marginTop: 4,
+        fontFamily: Platform.select({ ios: 'Courier', android: 'monospace' }),
     },
     quickApplyBanner: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: theme.colors.success + '15',
-        borderWidth: 2,
-        borderColor: theme.colors.success,
-        borderRadius: theme.borderRadius.lg,
+        backgroundColor: theme.colors.surface,
+        borderWidth: 1,
+        borderColor: theme.colors.text, // High contrast
+        borderRadius: 4,
         padding: theme.spacing.lg,
         marginBottom: theme.spacing.lg,
     },
@@ -950,25 +1202,38 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         flex: 1,
     },
+    quickApplyIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: 4,
+        backgroundColor: theme.colors.text,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: theme.spacing.md,
+    },
     quickApplyText: {
         marginLeft: theme.spacing.md,
         flex: 1,
     },
     quickApplyTitle: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: 'bold',
-        color: theme.colors.success,
+        color: theme.colors.text,
+        letterSpacing: -0.5,
     },
     quickApplyDesc: {
-        fontSize: 13,
+        fontSize: 12,
         color: theme.colors.textSecondary,
         marginTop: 2,
     },
     orDivider: {
         textAlign: 'center',
         color: theme.colors.textSecondary,
-        fontSize: 13,
+        fontSize: 11,
+        fontWeight: '600',
         marginBottom: theme.spacing.md,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
     },
     divider: {
         height: 1,

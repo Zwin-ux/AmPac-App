@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAnalytics, isSupported } from "firebase/analytics";
-import { initializeAuth, getAuth, Auth, getReactNativePersistence } from "firebase/auth";
+import { getAuth, Auth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -17,6 +17,21 @@ const firebaseConfig = {
     measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
+// Validate Config
+if (!firebaseConfig.apiKey) {
+    console.error("Firebase Config Error: Missing API Key. Check your .env file.");
+    throw new Error("Firebase Configuration Missing: API Key is undefined.");
+}
+if (!firebaseConfig.authDomain) {
+    console.warn("Firebase Config Warning: Missing Auth Domain.");
+}
+
+console.log("Firebase Config Loaded:", {
+    apiKey: firebaseConfig.apiKey ? "Present" : "MISSING",
+    authDomain: firebaseConfig.authDomain,
+    projectId: firebaseConfig.projectId
+});
+
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
@@ -24,19 +39,20 @@ const app = initializeApp(firebaseConfig);
 let analytics;
 isSupported().then(yes => yes && (analytics = getAnalytics(app)));
 
-// Initialize Auth with React Native persistence
+// Initialize Auth with Persistence
+// We use @react-native-async-storage/async-storage as recommended by the warning.
+// @ts-ignore
+import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
+
 let auth: Auth;
 try {
     auth = initializeAuth(app, {
         persistence: getReactNativePersistence(AsyncStorage)
     });
-    console.log("Firebase Auth initialized with persistence");
 } catch (e: any) {
-    console.log("Firebase Auth initialization error:", e.message);
-    // Fallback if already initialized or other error
+    // If already initialized, use getAuth
     if (e.code === 'auth/already-initialized') {
         auth = getAuth(app);
-        console.log("Firebase Auth retrieved from existing instance");
     } else {
         throw e;
     }

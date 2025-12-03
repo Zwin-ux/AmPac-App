@@ -94,16 +94,16 @@ class ApplicationStore {
     async syncWithServer(): Promise<Application | null> {
         const auth = getAuth(app);
         const userId = auth.currentUser?.uid || 'dev-user';
-        
+
         this.setState({ syncStatus: 'syncing' });
         logStoreEvent('syncWithServer.start', { userId });
 
         try {
             const serverApp = await getApplication(userId);
-            
+
             if (serverApp) {
                 const localDraft = this.state.draft;
-                
+
                 // Merge strategy: server wins unless local has higher version
                 if (localDraft && (localDraft.version ?? 0) > (serverApp.version ?? 0)) {
                     // Local is newer, push to server
@@ -112,10 +112,10 @@ class ApplicationStore {
                     return localDraft;
                 } else {
                     // Server is newer or equal, use server data
-                    this.setState({ 
-                        draft: serverApp, 
-                        syncStatus: 'synced', 
-                        lastSyncedAt: Date.now() 
+                    this.setState({
+                        draft: serverApp,
+                        syncStatus: 'synced',
+                        lastSyncedAt: Date.now()
                     });
                     await this.persistToStorage(serverApp);
                     return serverApp;
@@ -299,7 +299,7 @@ class ApplicationStore {
         // Import userStore dynamically to avoid circular dependency
         const { userStore } = await import('./userStore');
         const user = userStore.getCachedUser();
-        
+
         if (user) {
             return {
                 businessName: user.businessName || '',
@@ -316,6 +316,28 @@ class ApplicationStore {
     }
 
     // ============ CLEAR ============
+
+    async submit(): Promise<void> {
+        if (!this.state.draft) return;
+
+        this.setState({ syncStatus: 'syncing' });
+        try {
+            // 1. Ensure pending saves are flushed
+            await this.flushSave();
+
+            // 2. Call API
+            const { submitApplication } = await import('./applications');
+            await submitApplication(this.state.draft);
+
+            // 3. Update local state
+            this.updateField('status', 'submitted');
+            this.setState({ syncStatus: 'synced' });
+        } catch (error) {
+            console.error('Error submitting application:', error);
+            this.setState({ syncStatus: 'error' });
+            throw error;
+        }
+    }
 
     async clearDraft(): Promise<void> {
         this.setState({ draft: null, syncStatus: 'idle', lastSyncedAt: null });

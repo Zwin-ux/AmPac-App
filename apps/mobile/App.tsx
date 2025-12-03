@@ -85,9 +85,6 @@ function MainTabs() {
           component={AssistantScreen}
           options={{ title: 'Concierge' }}
         />
-        <Tab.Screen name="Spaces" component={SpacesNavigator} />
-        <Tab.Screen name="Network" component={NetworkScreen} />
-        <Tab.Screen name="Support" component={HotlineScreen} />
         <Tab.Screen name="Profile" component={ProfileScreen} />
       </Tab.Navigator>
     </>
@@ -134,6 +131,7 @@ function AppStack() {
           <Stack.Screen name="EditProfile" component={EditProfileScreen} />
           <Stack.Screen name="InviteFriends" component={InviteFriendsScreen} />
           <Stack.Screen name="WebsiteBuilder" component={WebsiteBuilderScreen} />
+          <Stack.Screen name="Network" component={NetworkScreen} />
         </>
       ) : (
         <>

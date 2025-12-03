@@ -1,138 +1,113 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Filter, AlertTriangle, Clock } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { loanService } from '../services/loanService';
-import type { Application } from '../types';
+import type { Application, ApplicationStatus } from '../types';
+import { useNavigate } from 'react-router-dom';
+import MyWorkPanel from '../components/dashboard/MyWorkPanel';
+
+const STATUS_COLUMNS: { title: string; statuses: ApplicationStatus[] }[] = [
+    { title: 'New / Submitted', statuses: ['submitted', 'draft'] },
+    { title: 'In Review', statuses: ['in_review', 'sba_submitted'] },
+    { title: 'Approved', statuses: ['conditional_approval', 'sba_approved'] },
+    { title: 'Closing / Funded', statuses: ['closing', 'funded'] },
+];
 
 export default function WorkboardPage() {
-    const navigate = useNavigate();
     const [applications, setApplications] = useState<Application[]>([]);
     const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
 
     useEffect(() => {
-        const fetchPipeline = async () => {
-            try {
-                const data = await loanService.getPipeline();
-                setApplications(data);
-            } catch (error) {
-                console.error("Error loading pipeline:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
         fetchPipeline();
     }, []);
 
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case 'submitted': return 'bg-blue-100 text-blue-800';
-            case 'in_review': return 'bg-yellow-100 text-yellow-800';
-            case 'approved': return 'bg-green-100 text-green-800';
-            case 'sba_approved': return 'bg-green-100 text-green-800';
-            case 'rejected': return 'bg-red-100 text-red-800';
-            default: return 'bg-gray-100 text-gray-800';
-        }
+    const fetchPipeline = async () => {
+        setLoading(true);
+        const data = await loanService.getPipeline();
+        setApplications(data);
+        setLoading(false);
     };
 
-    const formatCurrency = (amount?: number) => {
-        return amount ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount) : '-';
+    const handleCardClick = (id: string) => {
+        navigate(`/applications/${id}`);
     };
+
+    if (loading) {
+        return <div className="p-8 text-center">Loading pipeline...</div>;
+    }
 
     return (
-        <div className="p-8">
-            <header className="flex justify-between items-center mb-8">
+        <div className="h-full flex flex-col p-6">
+            <header className="mb-6 flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-primary">My Queue</h1>
-                    <p className="text-textSecondary mt-1">Manage your assigned applications</p>
+                    <h1 className="text-2xl font-bold text-gray-900">Pipeline Workboard</h1>
+                    <p className="text-sm text-gray-500">Real-time view of all active applications</p>
                 </div>
-                <div className="flex gap-3">
-                    <button className="flex items-center px-4 py-2 bg-surface border border-border rounded-md text-sm font-medium hover:bg-surfaceHighlight">
-                        <Filter className="w-4 h-4 mr-2" />
-                        Filter
-                    </button>
-                    <button className="px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primaryLight">
-                        New Application
-                    </button>
-                </div>
+                <button
+                    onClick={fetchPipeline}
+                    className="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                    Refresh
+                </button>
             </header>
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                {[
-                    { label: 'Total Assigned', value: applications.length.toString() },
-                    { label: 'Pending Review', value: applications.filter(a => a.status === 'submitted' || a.status === 'in_review').length.toString(), highlight: true },
-                    { label: 'Approved', value: applications.filter(a => a.status === 'conditional_approval' || a.status === 'sba_approved').length.toString() },
-                    { label: 'Drafts', value: applications.filter(a => a.status === 'draft').length.toString() },
-                ].map((stat, i) => (
-                    <div key={i} className="bg-surface p-4 rounded-lg border border-border shadow-subtle">
-                        <p className="text-sm font-medium text-textSecondary uppercase tracking-wider">{stat.label}</p>
-                        <p className={`text-3xl font-bold mt-2 ${stat.highlight ? 'text-accent' : 'text-primary'}`}>{stat.value}</p>
-                    </div>
-                ))}
-            </div>
+            <MyWorkPanel />
 
-            {/* Applications Table */}
-            <div className="bg-surface rounded-lg border border-border shadow-subtle overflow-hidden">
-                {loading ? (
-                    <div className="p-8 text-center text-textSecondary">Loading pipeline...</div>
-                ) : applications.length === 0 ? (
-                    <div className="p-8 text-center text-textSecondary">No applications found.</div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-surfaceHighlight border-b border-border">
-                                <tr>
-                                    <th className="px-6 py-3 font-medium text-textSecondary uppercase tracking-wider">App ID</th>
-                                    <th className="px-6 py-3 font-medium text-textSecondary uppercase tracking-wider">Business Name</th>
-                                    <th className="px-6 py-3 font-medium text-textSecondary uppercase tracking-wider">Amount</th>
-                                    <th className="px-6 py-3 font-medium text-textSecondary uppercase tracking-wider">Status</th>
-                                    <th className="px-6 py-3 font-medium text-textSecondary uppercase tracking-wider">Flags</th>
-                                    <th className="px-6 py-3 font-medium text-textSecondary uppercase tracking-wider">Last Updated</th>
-                                    <th className="px-6 py-3 font-medium text-textSecondary uppercase tracking-wider">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {applications.map((app) => (
-                                    <tr key={app.id} className="hover:bg-surfaceHighlight transition-colors">
-                                        <td className="px-6 py-4 font-mono text-textSecondary text-xs">{app.id?.substring(0, 8) || 'Unknown'}...</td>
-                                        <td className="px-6 py-4 font-medium text-primary">
-                                            {app.businessName || 'Unnamed Business'}
-                                            <div className="text-xs text-textSecondary font-normal mt-0.5">{app.type?.replace('_', ' ').toUpperCase()}</div>
-                                        </td>
-                                        <td className="px-6 py-4 font-mono text-textSecondary">{formatCurrency(app.requestedAmount || app.loanAmount)}</td>
-                                        <td className="px-6 py-4">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(app.status)}`}>
-                                                {app.status?.replace('_', ' ').toUpperCase() || 'UNKNOWN'}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex gap-1">
-                                                {app.flags?.map((flag, i) => (
-                                                    <span key={i} title={flag} className="w-2 h-2 rounded-full bg-red-500"></span>
-                                                ))}
-                                                {!app.flags?.length && <span className="text-textSecondary">-</span>}
+            <div className="flex-1 overflow-x-auto">
+                <div className="flex gap-6 min-w-max h-full pb-4">
+                    {STATUS_COLUMNS.map((column) => (
+                        <div key={column.title} className="w-80 flex flex-col bg-gray-50 rounded-lg border border-gray-200 h-full">
+                            <div className="p-3 border-b border-gray-200 bg-gray-100 rounded-t-lg">
+                                <h3 className="font-semibold text-gray-700 flex justify-between">
+                                    {column.title}
+                                    <span className="bg-gray-200 text-gray-600 py-0.5 px-2 rounded-full text-xs">
+                                        {applications.filter(app => column.statuses.includes(app.status)).length}
+                                    </span>
+                                </h3>
+                            </div>
+                            <div className="p-3 flex-1 overflow-y-auto space-y-3">
+                                {applications
+                                    .filter(app => column.statuses.includes(app.status))
+                                    .map(app => (
+                                        <div
+                                            key={app.id}
+                                            onClick={() => handleCardClick(app.id)}
+                                            className="bg-white p-4 rounded-md shadow-sm border border-gray-200 cursor-pointer hover:shadow-md transition-shadow"
+                                        >
+                                            <div className="flex justify-between items-start mb-2">
+                                                <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                                                    {app.type || 'Loan'}
+                                                </span>
+                                                {app.venturesLoanId && (
+                                                    <span className="text-[10px] text-gray-400 font-mono">
+                                                        #{app.venturesLoanId}
+                                                    </span>
+                                                )}
                                             </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-textSecondary">
-                                            <div className="flex items-center">
-                                                <Clock className="w-3 h-3 mr-1" />
-                                                {app.lastUpdated ? new Date(app.lastUpdated.seconds * 1000).toLocaleDateString() : '-'}
+                                            <h4 className="font-medium text-gray-900 mb-1 truncate">
+                                                {app.businessName || 'Unnamed Business'}
+                                            </h4>
+                                            <p className="text-sm text-gray-500 mb-3">
+                                                {app.loanAmount
+                                                    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(app.loanAmount)
+                                                    : 'Amount TBD'}
+                                            </p>
+
+                                            <div className="flex items-center justify-between text-xs text-gray-400 border-t pt-2 mt-2">
+                                                <span>{app.assignedTo ? 'Assigned' : 'Unassigned'}</span>
+                                                <span>{app.lastUpdated?.seconds ? new Date(app.lastUpdated.seconds * 1000).toLocaleDateString() : 'Just now'}</span>
                                             </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <button
-                                                onClick={() => navigate(`/applications/${app.id}`)}
-                                                className="text-primary font-medium hover:underline"
-                                            >
-                                                View
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+                                        </div>
+                                    ))}
+
+                                {applications.filter(app => column.statuses.includes(app.status)).length === 0 && (
+                                    <div className="text-center py-8 text-gray-400 text-sm italic">
+                                        No applications
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
     );

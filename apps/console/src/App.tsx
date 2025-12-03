@@ -36,7 +36,11 @@ function RequireAuth({ children }: { children: ReactNode }) {
   return children;
 }
 
+import { useNotifications } from './hooks/useNotifications';
+
 export default function App() {
+  useNotifications();
+
   return (
     <BrowserRouter>
       <Routes>

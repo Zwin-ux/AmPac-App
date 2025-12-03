@@ -1,0 +1,106 @@
+{
+    "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
+    "manifestVersion": "1.16",
+    "version": "1.0.0",
+    "id": "5244d262-4d74-453f-936e-5c38804c077f",
+    "packageName": "com.ampac.console",
+    "developer": {
+        "name": "AmPac Business Capital",
+        "websiteUrl": "https://console.ampac.com",
+        "privacyUrl": "https://console.ampac.com/privacy",
+        "termsOfUseUrl": "https://console.ampac.com/terms"
+    },
+    "icons": {
+        "color": "color.png",
+        "outline": "outline.png"
+    },
+    "name": {
+        "short": "AmPac Console",
+        "full": "AmPac Business Capital Console"
+    },
+    "description": {
+        "short": "Lending operations console for AmPac staff.",
+        "full": "Manage loan applications, communicate with borrowers, and track your pipeline directly from Teams and Outlook."
+    },
+    "accentColor": "#0052CC",
+    "staticTabs": [
+        {
+            "entityId": "console",
+            "name": "Console",
+            "contentUrl": "https://console.ampac.com",
+            "websiteUrl": "https://console.ampac.com",
+            "scopes": [
+                "personal"
+            ]
+        }
+    ],
+    "extensions": [
+        {
+            "requirements": {
+                "scopes": [
+                    "mail"
+                ]
+            },
+            "runtimes": [
+                {
+                    "id": "runtime_1",
+                    "type": "website",
+                    "url": "https://console.ampac.com/outlook-addin"
+                }
+            ],
+            "ribbons": [
+                {
+                    "name": "AmPac Actions",
+                    "tabs": [
+                        {
+                            "name": "AmPac",
+                            "groups": [
+                                {
+                                    "name": "Loan Actions",
+                                    "controls": [
+                                        {
+                                            "id": "viewApplication",
+                                            "type": "button",
+                                            "label": "View Application",
+                                            "icons": [
+                                                {
+                                                    "size": 16,
+                                                    "file": "icon16.png"
+                                                }
+                                            ],
+                                            "actionId": "showTaskPane"
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "contextMenus": [
+                {
+                    "id": "contextMenu",
+                    "items": [
+                        {
+                            "id": "viewAppCtx",
+                            "label": "View in AmPac Console",
+                            "actionId": "showTaskPane"
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "permissions": [
+        "identity",
+        "messageTeamMembers"
+    ],
+    "validDomains": [
+        "console.ampac.com",
+        "ampac-brain.firebaseapp.com"
+    ],
+    "webApplicationInfo": {
+        "id": "YOUR_CLIENT_ID_HERE",
+        "resource": "api://console.ampac.com/YOUR_CLIENT_ID_HERE"
+    }
+}

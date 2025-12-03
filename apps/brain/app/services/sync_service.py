@@ -7,6 +7,10 @@ from app.services.ventures.mock import MockVenturesClient
 from app.services.sharefile_client import ShareFileClient
 from app.core.firebase import get_db
 from app.core.constants import VENTURES_STATUS_MAP, ApplicationStatus
+from typing import Callable, Any
+
+# Global singleton
+sync_service_instance = None
 
 class SyncService:
     """
@@ -14,7 +18,11 @@ class SyncService:
     """
 
     def __init__(self):
+        global sync_service_instance
+        sync_service_instance = self
+
         settings = get_settings()
+
         if settings.VENTURES_MOCK_MODE:
             print("SyncService: Using MockVenturesClient")
             self.ventures_client: AbstractVenturesClient = MockVenturesClient()
@@ -25,22 +33,111 @@ class SyncService:
             
         self.sharefile_client = ShareFileClient()
         self.db = get_db()
+        
+        # Stats and Logs
+        self.recent_logs = []
+        self.stats = {"synced": 0, "pending": 0, "errors": 0}
+
+    async def _with_retry(self, func: Callable[[], Any], label: str, retries: int = 3, base_delay: float = 1.0):
+        """
+        Simple exponential backoff wrapper for flaky operations.
+        """
+        last_exc = None
+        for attempt in range(retries):
+            try:
+                return await func()
+            except Exception as e:
+                last_exc = e
+                if attempt == retries - 1:
+                    break
+                delay = base_delay * (2 ** attempt)
+                self.log_event("info", f"{label} retry {attempt+1}/{retries}: {e}")
+                await asyncio.sleep(delay)
+        raise last_exc if last_exc else Exception(f"{label} failed without exception")
+
+    def log_event(self, status: str, message: str):
+        """
+        Records a sync event in memory.
+        """
+        entry = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "status": status,
+            "message": message
+        }
+        self.recent_logs.insert(0, entry)
+        self.recent_logs = self.recent_logs[:50] # Keep last 50
+        
+        if status == "error":
+            self.stats["errors"] += 1
+        elif status == "success":
+            self.stats["synced"] += 1
+
+    def get_sync_stats(self):
+        return {
+            "syncedCount": self.stats["synced"],
+            "pendingCount": self.stats["pending"], # Could be calculated from DB
+            "errorCount": self.stats["errors"]
+        }
+
+    def get_recent_logs(self, limit: int = 10):
+        return self.recent_logs[:limit]
 
     async def start_sync_loop(self):
         """
         Starts the background synchronization loop.
         """
         print("Starting Sync Service Loop...")
+        
+        # Initial Seed for Demo Purposes
+        await self.seed_initial_data()
+
         while True:
             try:
                 await self.sync_loan_statuses()
                 await self.sync_tasks()
                 await self.sync_uploads_to_ventures()
+                await self._update_pending_stats()
             except Exception as e:
                 print(f"Error in sync loop: {e}")
+                self.log_event("error", str(e))
             
-            # Sleep for a defined interval (e.g., 30 seconds for demo purposes)
-            await asyncio.sleep(30) 
+            # Sleep for a defined interval (e.g., 10 seconds for demo responsiveness)
+            await asyncio.sleep(10) 
+
+    async def seed_initial_data(self):
+        """
+        Seeds Firestore with mock data from Ventures if it doesn't exist.
+        This ensures the Console has data to display immediately.
+        """
+        try:
+            print("Checking if seeding is needed...")
+            loans = await self._with_retry(self.ventures_client.get_all_loans, "ventures.get_all_loans")
+            apps_ref = self.db.collection("applications")
+            
+            for loan in loans:
+                # Check if app exists with this venturesLoanId
+                query = apps_ref.where("venturesLoanId", "==", loan.id).limit(1).stream()
+                existing_doc = next(query, None)
+                
+                if not existing_doc:
+                    print(f"Seeding Loan {loan.id} into Firestore...")
+                    # Map status
+                    app_status = VENTURES_STATUS_MAP.get(loan.status_name, ApplicationStatus.SUBMITTED)
+                    
+                    new_app = {
+                        "venturesLoanId": loan.id,
+                        "businessName": loan.borrower_name,
+                        "status": app_status,
+                        "venturesStatus": loan.status_name,
+                        "loanAmount": loan.balance,
+                        "officerName": loan.officer_name,
+                        "createdAt": datetime.utcnow(),
+                        "lastSyncedAt": datetime.utcnow(),
+                        "userId": "demo_user" # Placeholder
+                    }
+                    apps_ref.add(new_app)
+        except Exception as e:
+            print(f"Error seeding data: {e}")
 
     async def sync_loan_statuses(self):
         """
@@ -60,7 +157,10 @@ class SyncService:
                     continue
 
                 # 2. Call Ventures API
-                loan_detail = await self.ventures_client.get_loan_detail(ventures_id)
+                loan_detail = await self._with_retry(
+                    lambda: self.ventures_client.get_loan_detail(ventures_id),
+                    f"ventures.get_loan_detail[{ventures_id}]"
+                )
                 if not loan_detail:
                     continue
 
@@ -78,9 +178,18 @@ class SyncService:
                         "venturesStatus": ventures_status_name,
                         "lastSyncedAt": datetime.utcnow()
                     })
+                    self.log_event("success", f"Updated Loan {doc.id}: {current_status} -> {new_app_status}")
+                else:
+                    # Still refresh venturesStatus/lastSyncedAt for observability
+                    apps_ref.document(doc.id).update({
+                        "venturesStatus": ventures_status_name,
+                        "lastSyncedAt": datetime.utcnow()
+                    })
+                    self.log_event("info", f"Checked Loan {doc.id}: no status change")
                     
         except Exception as e:
             print(f"Error syncing loan statuses: {e}")
+            self.log_event("error", f"Sync loan statuses failed: {e}")
 
     async def sync_tasks(self):
         """
@@ -98,7 +207,10 @@ class SyncService:
                     continue
 
                 # 1. Get Conditions from Ventures
-                conditions = await self.ventures_client.get_conditions(ventures_id)
+                conditions = await self._with_retry(
+                    lambda: self.ventures_client.get_conditions(ventures_id),
+                    f"ventures.get_conditions[{ventures_id}]"
+                )
                 
                 # 2. Get existing Tasks for this loan
                 tasks_ref = self.db.collection("tasks")
@@ -120,17 +232,15 @@ class SyncService:
                         task_doc = existing_task_map[cond_id]
                         current_task_status = task_doc.to_dict().get("status")
                         
-                        # Only update if changed AND if the change is coming from Ventures (source of truth)
-                        # But wait, if we just uploaded a file, we marked it completed locally.
-                        # If Ventures still says "Open", we shouldn't revert it immediately if we are waiting for sync.
-                        # However, for this simple sync, we assume Ventures is master.
-                        # If we uploaded, we should have updated Ventures status too (see sync_uploads_to_ventures).
-                        
-                        if current_task_status != task_status:
-                            tasks_ref.document(task_doc.id).update({
-                                "status": task_status,
-                                "lastSyncedAt": datetime.utcnow()
-                            })
+                        # Never downgrade from completed -> open to avoid UI flicker while awaiting Ventures acceptance
+                        if current_task_status == task_status or (current_task_status == "completed" and task_status == "open"):
+                            continue
+
+                        tasks_ref.document(task_doc.id).update({
+                            "status": task_status,
+                            "lastSyncedAt": datetime.utcnow()
+                        })
+                        self.log_event("success", f"Task {task_doc.id} -> {task_status} from Ventures")
                     elif task_status == "open":
                         # Create new task only if it's open
                         new_task = {
@@ -142,12 +252,15 @@ class SyncService:
                             "status": "open",
                             "priority": "high",
                             "createdAt": datetime.utcnow(),
-                            "createdBy": "system_sync"
+                            "createdBy": "system_sync",
+                            "lastSyncedAt": datetime.utcnow()
                         }
                         tasks_ref.add(new_task)
+                        self.log_event("success", f"Created task for Loan {doc.id} from Ventures condition {cond_id}")
 
         except Exception as e:
             print(f"Error syncing tasks: {e}")
+            self.log_event("error", f"Sync tasks failed: {e}")
 
     async def sync_uploads_to_ventures(self):
         """
@@ -185,7 +298,20 @@ class SyncService:
                     if matching_cond and matching_cond.status == "Open":
                         print(f"Pushing Upload Status to Ventures: {cond_id} -> Received")
                         await self.ventures_client.update_condition_status(cond_id, "Received")
+                        self.log_event("success", f"Marked condition {cond_id} as Received in Ventures")
 
         except Exception as e:
             print(f"Error syncing uploads: {e}")
+            self.log_event("error", f"Sync uploads failed: {e}")
+
+    async def _update_pending_stats(self):
+        """
+        Refreshes pending stats for dashboard visibility.
+        """
+        try:
+            tasks_ref = self.db.collection("tasks")
+            pending = sum(1 for _ in tasks_ref.where("status", "==", "open").stream())
+            self.stats["pending"] = pending
+        except Exception as e:
+            print(f"Error updating pending stats: {e}")
 

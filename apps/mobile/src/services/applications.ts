@@ -1,21 +1,35 @@
-import {
-    collection,
-    doc,
-    setDoc,
-    getDocs,
-    query,
-    where,
-    Timestamp,
-    limit,
-    orderBy
-} from 'firebase/firestore';
-import { db } from '../../firebaseConfig';
+import { Timestamp } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 import { Application, ApplicationType } from '../types';
 import { cacheService } from './cache';
-import { syncService, SyncJob } from './sync';
+import { API_URL } from '../config';
 
 export const APPLICATION_CACHE_KEY_PREFIX = 'cache_application_';
 const buildCacheKey = (userId: string) => `${APPLICATION_CACHE_KEY_PREFIX}${userId}`;
+
+// Helper to convert API response (ISO strings) to Firestore Timestamps
+const convertDatesToTimestamps = (data: any): any => {
+    if (!data) return data;
+    if (typeof data === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(data)) {
+        return Timestamp.fromDate(new Date(data));
+    }
+    if (Array.isArray(data)) {
+        return data.map(convertDatesToTimestamps);
+    }
+    if (typeof data === 'object') {
+        const result: any = {};
+        for (const key in data) {
+            result[key] = convertDatesToTimestamps(data[key]);
+        }
+        return result;
+    }
+    return data;
+};
+
+const getAuthToken = async () => {
+    const auth = getAuth();
+    return auth.currentUser?.getIdToken();
+};
 
 export const cacheApplicationSnapshot = async (application: Application): Promise<void> => {
     try {
@@ -40,20 +54,26 @@ export const getApplication = async (userId: string): Promise<Application | null
     }
 
     try {
-        const appsCol = collection(db, 'applications');
-        // Get the most recent application for the user
-        const q = query(
-            appsCol,
-            where('userId', '==', userId),
-            orderBy('createdAt', 'desc'),
-            limit(1)
-        );
-        const snapshot = await getDocs(q);
+        const token = await getAuthToken();
+        const url = `${API_URL}/applications/user/me`;
+        console.log(`[Applications] Fetching from: ${url}`);
 
-        if (!snapshot.empty) {
-            const doc = snapshot.docs[0];
-            const appData = { id: doc.id, version: 1, ...doc.data() } as Application;
-            // Update cache
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'x-user-id': userId
+            }
+        });
+
+        if (!response.ok) {
+            if (response.status === 404) return null;
+            throw new Error(`API Error: ${response.status}`);
+        }
+
+        const apps = await response.json();
+        if (apps && apps.length > 0) {
+            // Get most recent
+            const appData = convertDatesToTimestamps(apps[0]) as Application;
             await cacheService.set(cacheKey, appData);
             return appData;
         }
@@ -64,89 +84,64 @@ export const getApplication = async (userId: string): Promise<Application | null
     }
 };
 
-const queueOfflineWrite = async (job: Omit<SyncJob, 'id' | 'timestamp'>) => {
-    console.warn('Queueing offline write', { collection: job.collection, docId: job.docId, merge: job.merge });
-    await syncService.queueWrite(job);
-};
-
 export const saveApplication = async (id: string, data: Partial<Application>): Promise<void> => {
     try {
-        const appDoc = doc(db, 'applications', id);
-        const updatedData = {
-            ...data,
-            version: typeof data.version === 'number' ? data.version : 1,
-            lastUpdated: Timestamp.now()
-        };
+        const token = await getAuthToken();
+        const response = await fetch(`${API_URL}/applications/${id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(data)
+        });
 
-        // 1. Update Firestore
-        await setDoc(appDoc, updatedData, { merge: true });
+        if (!response.ok) {
+            throw new Error(`API Error: ${response.status}`);
+        }
 
-        // 2. Update Cache (we need the full object for cache, but we might only have partial here)
-        // Strategy: Fetch current cache, merge, and save back.
-        // Since we don't have userId easily here, we might need to pass it or store it.
-        // For simplicity, we'll assume the UI passes enough data or we re-fetch if needed.
-        // BETTER: The UI usually holds the full 'application' state. 
-        // Let's rely on the UI to update the local state, but we should try to update the cache if possible.
-        // Actually, let's just invalidate the cache or update it if we can.
-
-        // To properly update cache, we need the userId to form the key. 
-        // If 'data' has userId, great. If not, we might miss updating the cache key correctly.
-        // Let's assume the calling component manages the 'application' state and we can just update the cache 
-        // from the UI side if we wanted to be 100% sync, OR we just accept that saveApplication writes to DB.
-
-        // However, to fix the "loading hell", `getApplication` needs to find data.
-        // If we save to DB but don't update cache, the next `getApplication` might still return old cache 
-        // (if we didn't invalidate) or hit DB if cache expired.
-
-        // Let's update the cache if we have the userId.
+        // Update Cache
         if (data.userId) {
             const cacheKey = buildCacheKey(data.userId);
-            // We need to merge with existing cache to be safe
             const existing = await cacheService.get<Application>(cacheKey);
             if (existing) {
-                await cacheService.set(cacheKey, { ...existing, ...updatedData });
+                await cacheService.set(cacheKey, { ...existing, ...data, lastUpdated: Timestamp.now() });
             }
         }
 
     } catch (error) {
         console.error("Error saving application:", error);
-        if (data.userId) {
-            await queueOfflineWrite({
-                collection: 'applications',
-                docId: id,
-                payload: {
-                    ...data,
-                    version: typeof data.version === 'number' ? data.version : 1,
-                    lastUpdated: Timestamp.now()
-                },
-                merge: true,
-            });
-        }
+        // TODO: Queue offline write if needed, but for now we rely on API
         throw error;
     }
 };
 
 export const createApplication = async (userId: string, type: ApplicationType): Promise<Application> => {
-    const newApp: Application = {
-        id: `app_${Date.now()}`,
-        userId,
-        type,
-        status: 'draft',
-        currentStep: 1,
-        businessName: '',
-        yearsInBusiness: 0,
-        annualRevenue: 0,
-        loanAmount: 0,
-        useOfFunds: '',
-        data: {},
-        version: 1,
-        createdAt: Timestamp.now(),
-        lastUpdated: Timestamp.now(),
-    };
-
     try {
-        const appDoc = doc(db, 'applications', newApp.id);
-        await setDoc(appDoc, newApp);
+        const token = await getAuthToken();
+        const response = await fetch(`${API_URL}/applications/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                userId,
+                type,
+                // Default empty fields to satisfy schema if needed
+                businessName: '',
+                yearsInBusiness: 0,
+                annualRevenue: 0,
+                loanAmount: 0,
+                useOfFunds: ''
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`API Error: ${response.status}`);
+        }
+
+        const newApp = convertDatesToTimestamps(await response.json()) as Application;
 
         // Update Cache
         await cacheApplicationSnapshot(newApp);
@@ -154,24 +149,28 @@ export const createApplication = async (userId: string, type: ApplicationType): 
         return newApp;
     } catch (error) {
         console.error("Error creating application:", error);
-        await queueOfflineWrite({
-            collection: 'applications',
-            docId: newApp.id,
-            payload: newApp,
-            merge: false,
-        });
-        // Return the local draft so UI can proceed offline; queued write will sync later.
-        return newApp;
+        throw error;
     }
 };
 
 export const submitApplication = async (application: Application): Promise<void> => {
     try {
-        const updates: Partial<Application> = { status: 'submitted', lastUpdated: Timestamp.now() };
-        await saveApplication(application.id, { ...application, ...updates });
+        const token = await getAuthToken();
+        const response = await fetch(`${API_URL}/applications/${application.id}/submit`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`API Error: ${response.status}`);
+        }
+
+        const updatedApp = convertDatesToTimestamps(await response.json()) as Application;
 
         // Update Cache
-        await cacheApplicationSnapshot({ ...application, ...updates });
+        await cacheApplicationSnapshot(updatedApp);
     } catch (error) {
         console.error("Error submitting application:", error);
         throw error;
@@ -180,10 +179,20 @@ export const submitApplication = async (application: Application): Promise<void>
 
 export const getUserApplications = async (userId: string): Promise<Application[]> => {
     try {
-        const appsCol = collection(db, 'applications');
-        const q = query(appsCol, where('userId', '==', userId));
-        const snapshot = await getDocs(q);
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Application));
+        const token = await getAuthToken();
+        const response = await fetch(`${API_URL}/applications/user/me`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'x-user-id': userId
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`API Error: ${response.status}`);
+        }
+
+        const apps = await response.json();
+        return apps.map(convertDatesToTimestamps);
     } catch (error) {
         console.error("Error fetching applications:", error);
         return [];
@@ -191,13 +200,8 @@ export const getUserApplications = async (userId: string): Promise<Application[]
 };
 
 export const flushPendingApplicationWrites = async (): Promise<void> => {
-    await syncService.flushQueue(async (job) => {
-        if (job.collection !== 'applications') return;
-        const appDoc = doc(db, job.collection, job.docId);
-        await setDoc(appDoc, job.payload, { merge: job.merge !== false });
-        if (job.payload.userId) {
-            const cacheKey = buildCacheKey(job.payload.userId);
-            await cacheService.set(cacheKey, job.payload as Application);
-        }
-    });
+    // No-op for now as we are API-first. 
+    // In a real offline-first app, we'd replay the queue against the API.
+    console.log("flushPendingApplicationWrites: Not implemented for API mode");
 };
+

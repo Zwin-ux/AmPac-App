@@ -11,6 +11,8 @@ class WebsiteGenerationRequest(BaseModel):
     description: str
     phone: str | None = None
     email: str | None = None
+    hasBusinessPlan: bool = False
+    ownerName: str | None = None
 
 class WebsiteGenerationResponse(BaseModel):
     html: str

@@ -27,6 +27,9 @@ export default function ProfileScreen({ navigation }: any) {
                 const cached = await cacheService.get<User>(CACHE_KEY_PROFILE);
                 if (cached) {
                     setUser(cached);
+                    if (cached.notificationsEnabled !== undefined) {
+                        setNotificationsEnabled(cached.notificationsEnabled);
+                    }
                     setLoading(false);
                 }
 
@@ -34,6 +37,9 @@ export default function ProfileScreen({ navigation }: any) {
                 if (currentUser) {
                     const userData = await getCurrentUserDoc(currentUser.uid);
                     setUser(userData);
+                    if (userData?.notificationsEnabled !== undefined) {
+                        setNotificationsEnabled(userData.notificationsEnabled);
+                    }
                     await cacheService.set(CACHE_KEY_PROFILE, userData);
                 } else {
                     // Mock user for dev mode
@@ -137,7 +143,24 @@ export default function ProfileScreen({ navigation }: any) {
                     <View style={[styles.infoRow, { justifyContent: 'space-between', alignItems: 'center' }]}>
                         <Text style={styles.settingLabel}>NOTIFICATIONS</Text>
                         <TouchableOpacity
-                            onPress={() => setNotificationsEnabled(!notificationsEnabled)}
+                            onPress={async () => {
+                                const newValue = !notificationsEnabled;
+                                setNotificationsEnabled(newValue);
+                                if (auth.currentUser) {
+                                    try {
+                                        const { updateUserDoc } = await import('../services/firestore');
+                                        await updateUserDoc(auth.currentUser.uid, { notificationsEnabled: newValue });
+                                        // Update cache
+                                        const updated = { ...user, notificationsEnabled: newValue } as User;
+                                        setUser(updated);
+                                        await cacheService.set(CACHE_KEY_PROFILE, updated);
+                                    } catch (err) {
+                                        console.error("Failed to save notification setting", err);
+                                        // Revert on error
+                                        setNotificationsEnabled(!newValue);
+                                    }
+                                }
+                            }}
                             style={[styles.toggle, notificationsEnabled && styles.toggleActive]}
                         >
                             <View style={[styles.toggleKnob, notificationsEnabled && styles.toggleKnobActive]} />

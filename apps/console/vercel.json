@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    }
+  ],
+  "env": {
+    "VITE_API_URL": "https://brain-service-952649324958.us-central1.run.app/api/v1"
+  },
+  "framework": "vite",
+  "ignoreCommand": "true"
+}

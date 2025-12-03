@@ -1,6 +1,7 @@
-import type { VenturesLoanStatus, VenturesFieldMapping, VenturesSyncLog, SyncMode } from '../types';
+import type { VenturesLoanStatus, VenturesSyncLog, SyncMode, VenturesDashboardStats } from '../types';
+import { API_URL as BASE_API_URL } from '../config';
 
-const API_URL = 'http://localhost:8000/api/v1/ventures';
+const API_URL = `${BASE_API_URL}/ventures`;
 
 export const venturesService = {
     // Get current status and field mappings
@@ -30,7 +31,7 @@ export const venturesService = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ loanId, mode, note })
             });
-            
+
             if (!response.ok) throw new Error('Sync failed');
             return await response.json();
         } catch (error) {
@@ -40,15 +41,15 @@ export const venturesService = {
     },
 
     // Get global dashboard stats
-    getDashboardStats: async () => {
-        // This endpoint doesn't exist on backend yet, keep mock
-        await new Promise(resolve => setTimeout(resolve, 600));
-        return {
-            synced: 142,
-            pending: 12,
-            errors: 5,
-            recentLogs: []
-        };
+    getDashboardStats: async (): Promise<VenturesDashboardStats> => {
+        try {
+            const response = await fetch(`${API_URL}/dashboard`);
+            if (!response.ok) throw new Error('Failed to fetch dashboard stats');
+            return await response.json();
+        } catch (error) {
+            console.error(error);
+            throw error;
+        }
     },
 
     // Configure credentials
@@ -58,7 +59,7 @@ export const venturesService = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password, site_name: siteName })
         });
-        
+
         if (!response.ok) {
             const err = await response.json();
             throw new Error(err.detail || 'Configuration failed');

@@ -12,3 +12,8 @@ msgraph-core
 msgraph-sdk
 pydantic-settings
 cryptography
+# Document Processing
+pdfplumber==0.10.3
+openpyxl==3.1.2
+pandas
+python-multipart==0.0.6

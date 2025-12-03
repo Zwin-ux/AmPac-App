@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     VENTURES_USERNAME: Optional[str] = None
     VENTURES_PASSWORD: Optional[str] = None
     VENTURES_MOCK_MODE: bool = True
+    USE_FAKE_SYNC: bool = False
 
     # ShareFile API
     SHAREFILE_CLIENT_ID: Optional[str] = None

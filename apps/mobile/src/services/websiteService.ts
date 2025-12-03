@@ -1,14 +1,6 @@
-import { Platform } from 'react-native';
+import { API_URL } from '../config';
 
-// Helper to get the correct localhost URL based on platform
-const getBaseUrl = () => {
-    if (Platform.OS === 'android') {
-        return 'http://10.0.2.2:8000/api/v1';
-    }
-    return 'http://localhost:8000/api/v1';
-};
-
-const BRAIN_API_URL = getBaseUrl();
+const BRAIN_API_URL = API_URL;
 
 export interface WebsiteGenerationRequest {
     name: string;
@@ -17,6 +9,8 @@ export interface WebsiteGenerationRequest {
     description: string;
     phone?: string;
     email?: string;
+    hasBusinessPlan?: boolean;
+    ownerName?: string;
 }
 
 export interface WebsiteGenerationResponse {

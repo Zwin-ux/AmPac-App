@@ -20,7 +20,22 @@ class LLMService:
             return "OpenAI API Key not configured. Please set OPENAI_API_KEY in .env."
         
         try:
-            response = await self.llm.ainvoke(prompt)
+            # Construct a prompt with system instructions
+            system_instruction = """
+            You are the AmPac Brain, an intelligent assistant for AmPac Business Capital.
+            Your goal is to help users with loan applications and business financing.
+
+            CAPABILITIES:
+            - If the user expresses a clear intent to "apply for a loan", "start an application", or "get financing", you MUST include the following action tag at the end of your response:
+              <<<ACTION:{"type":"navigate","target":"Apply"}>>>
+            
+            - Keep your responses concise, professional, and helpful.
+            - Do not hallucinate loan terms.
+            """
+            
+            full_prompt = f"{system_instruction}\n\nUser: {prompt}\nAssistant:"
+            
+            response = await self.llm.ainvoke(full_prompt)
             return response.content
         except Exception as e:
             return f"Error interacting with LLM: {str(e)}"

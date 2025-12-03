@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../firebaseConfig';
 import { createUserDoc } from '../services/firestore';
 import { serverTimestamp } from 'firebase/firestore';
 import { theme } from '../theme';
 
+import { useNavigation } from '@react-navigation/native';
+
 export default function SignUpScreen() {
+    const navigation = useNavigation<any>();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [fullName, setFullName] = useState('');
@@ -35,7 +38,12 @@ export default function SignUpScreen() {
             });
 
         } catch (error: any) {
-            Alert.alert('Sign Up Error', error.message);
+            console.error("SignUp Error:", error);
+            if (error.code === 'auth/configuration-not-found') {
+                Alert.alert('Configuration Error', 'Firebase Auth is not configured correctly. Please check your .env file and ensure EXPO_PUBLIC_FIREBASE_API_KEY is set.');
+            } else {
+                Alert.alert('Sign Up Error', error.message);
+            }
         } finally {
             setLoading(false);
         }
@@ -48,6 +56,11 @@ export default function SignUpScreen() {
         >
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 <View style={styles.card}>
+                    <Image
+                        source={require('../../assets/ampac_logo.png')}
+                        style={styles.logo}
+                        resizeMode="contain"
+                    />
                     <Text style={styles.title}>Create Account</Text>
                     <Text style={styles.subtitle}>Join AmPac today</Text>
 
@@ -117,6 +130,49 @@ export default function SignUpScreen() {
                             <Text style={styles.buttonText}>Sign Up</Text>
                         )}
                     </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.linkButton}
+                        onPress={() => navigation.navigate('SignIn')}
+                    >
+                        <Text style={styles.linkText}>Already have an account? Sign In</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.demoButton}
+                        onPress={async () => {
+                            setLoading(true);
+                            try {
+                                // OFFLINE DEMO MODE
+                                const { Timestamp } = await import('firebase/firestore');
+                                const { userStore } = await import('../services/userStore');
+
+                                const demoProfile = {
+                                    uid: 'demo-user-123',
+                                    role: 'entrepreneur',
+                                    fullName: 'Alex Rivera',
+                                    businessName: 'Rivera Innovations',
+                                    phone: '909-555-0101',
+                                    industry: 'Technology',
+                                    city: 'Riverside',
+                                    bio: 'Building the future of sustainable tech in the Inland Empire.',
+                                    jobTitle: 'Founder & CEO',
+                                    createdAt: Timestamp.now(),
+                                };
+
+                                // Bypass Firebase Auth completely
+                                userStore.setDemoUser(demoProfile as any);
+
+                            } catch (error: any) {
+                                Alert.alert('Demo Error', error.message);
+                            } finally {
+                                setLoading(false);
+                            }
+                        }}
+                        disabled={loading}
+                    >
+                        <Text style={styles.demoButtonText}>⚡ Demo Mode (Bypass)</Text>
+                    </TouchableOpacity>
                 </View>
             </ScrollView>
         </KeyboardAvoidingView>
@@ -138,6 +194,12 @@ const styles = StyleSheet.create({
         padding: theme.spacing.xl,
         borderRadius: theme.borderRadius.lg,
         ...theme.shadows.card,
+    },
+    logo: {
+        width: '80%',
+        height: 60,
+        alignSelf: 'center',
+        marginBottom: theme.spacing.md,
     },
     title: {
         ...theme.typography.h2,
@@ -176,5 +238,28 @@ const styles = StyleSheet.create({
     },
     buttonText: {
         ...(theme.typography.button as any),
+    },
+    linkButton: {
+        marginTop: theme.spacing.lg,
+        alignItems: 'center',
+    },
+    linkText: {
+        color: theme.colors.primary,
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    demoButton: {
+        marginTop: theme.spacing.xl,
+        padding: theme.spacing.sm,
+        alignItems: 'center',
+        backgroundColor: theme.colors.surfaceHighlight,
+        borderRadius: theme.borderRadius.md,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+    },
+    demoButtonText: {
+        color: theme.colors.textSecondary,
+        fontSize: 14,
+        fontWeight: '600',
     },
 });

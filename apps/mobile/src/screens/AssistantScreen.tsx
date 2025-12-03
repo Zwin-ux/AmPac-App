@@ -12,7 +12,10 @@ type Message = {
     timestamp: number;
 };
 
+import { useNavigation } from '@react-navigation/native';
+
 export default function AssistantScreen() {
+    const navigation = useNavigation();
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputText, setInputText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -47,30 +50,106 @@ export default function AssistantScreen() {
         setError(null);
 
         try {
-            // Mock API call
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            const { getAuth } = await import('firebase/auth');
+            const { API_URL } = await import('../config');
 
-            // Simple mock response logic
-            let responseText = "I'm still learning, but I've noted your question for a staff member.";
-            const lowerInput = userMsg.text.toLowerCase();
+            const auth = getAuth();
+            const token = await auth.currentUser?.getIdToken();
 
-            if (lowerInput.includes('status')) {
-                responseText = "I can't see your live status just yet, but typically applications take 2-3 days to review.";
-            } else if (lowerInput.includes('document') || lowerInput.includes('tax')) {
-                responseText = "For most loans, we need your last 2 years of business tax returns and a current P&L statement.";
-            } else if (lowerInput.includes('hello') || lowerInput.includes('hi')) {
-                responseText = "Hello! Ready to help with your business financing needs.";
+            if (!token) {
+                // Fallback for dev/demo if no real auth
+                console.warn("No auth token found, using dev mode");
+            }
+
+            console.log(`[Assistant] Sending request to: ${API_URL}/chat/completions`);
+            console.log(`[Assistant] Token: ${token ? 'Present' : 'Missing'}`);
+
+            const response = await fetch(`${API_URL}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token || 'dev-token'}`
+                },
+                body: JSON.stringify({
+                    messages: [
+                        { role: 'system', content: "You are a helpful assistant for AmPac Business Capital." },
+                        ...messages.map(m => ({ role: m.sender === 'user' ? 'user' : 'assistant', content: m.text })),
+                        { role: 'user', content: userMsg.text }
+                    ],
+                    context: {
+                        userRole: 'borrower',
+                        screen: 'AssistantScreen'
+                    },
+                    stream: false
+                })
+            });
+
+            console.log(`[Assistant] Response Status: ${response.status}`);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`[Assistant] Error Body: ${errorText}`);
+                throw new Error(`Server error: ${response.status} - ${errorText}`);
+            }
+
+            const data = await response.json();
+            console.log('[Assistant] Response Data:', data);
+
+            // Handle both sync response formats (standard OpenAI or custom)
+            let content = data.choices?.[0]?.message?.content || data.response || "I didn't get a response.";
+
+            // Check for Action Tag
+            const actionRegex = /<<<ACTION:(.*?)>>>/;
+            const match = content.match(actionRegex);
+
+            if (match) {
+                try {
+                    const actionJson = match[1];
+                    const action = JSON.parse(actionJson);
+                    console.log("[Assistant] Detected Action:", action);
+
+                    // Remove tag from content
+                    content = content.replace(match[0], '').trim();
+
+                    // Execute Action
+                    if (action.type === 'navigate') {
+                        // Small delay to let user read message
+                        setTimeout(() => {
+                            // Use root navigation if possible, or assume we are in a tab navigator
+                            // We need useNavigation for this.
+                            // For now, I'll assume navigation prop is available or I'll add useNavigation
+                        }, 1500);
+                        // We need to access navigation. I'll add useNavigation hook at the top.
+                    }
+                } catch (e) {
+                    console.error("[Assistant] Failed to parse action:", e);
+                }
             }
 
             const aiMsg: Message = {
                 id: (Date.now() + 1).toString(),
-                text: responseText,
+                text: content,
                 sender: 'ai',
                 timestamp: Date.now(),
             };
             setMessages(prev => [...prev, aiMsg]);
+
+            // Execute Navigation after state update
+            if (match) {
+                try {
+                    const action = JSON.parse(match[1]);
+                    if (action.type === 'navigate' && action.target === 'Apply') {
+                        setTimeout(() => {
+                            // @ts-ignore
+                            navigation.navigate('Apply');
+                        }, 1000);
+                    }
+                } catch (e) { }
+            }
+
         } catch (err) {
-            setError("I'm having trouble connecting. Please try again.");
+            console.error('[Assistant] Request Failed:', err);
+            setError("I'm having trouble connecting to the Brain. Please try again.");
         } finally {
             setIsLoading(false);
         }
@@ -93,58 +172,60 @@ export default function AssistantScreen() {
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>AmPac Assistant</Text>
-                <View style={styles.badge}>
-                    <Text style={styles.badgeText}>BETA</Text>
-                </View>
-            </View>
-
-            <FlatList
-                ref={flatListRef}
-                data={messages}
-                renderItem={renderItem}
-                keyExtractor={item => item.id}
-                contentContainerStyle={styles.listContent}
-                onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-                onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
-            />
-
-            {error && (
-                <View style={styles.errorContainer}>
-                    <Text style={styles.errorText}>{error}</Text>
-                </View>
-            )}
-
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-                style={styles.inputContainer}
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
             >
-                <View style={styles.inputWrapper}>
-                    <TextInput
-                        style={styles.input}
-                        value={inputText}
-                        onChangeText={setInputText}
-                        placeholder="Type a message..."
-                        placeholderTextColor={theme.colors.textSecondary}
-                        multiline
-                    />
-                    <TouchableOpacity
-                        style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
-                        onPress={handleSend}
-                        disabled={!inputText.trim() || isLoading}
-                    >
-                        {isLoading ? (
-                            <ActivityIndicator size="small" color="#fff" />
-                        ) : (
-                            <Ionicons name="arrow-up" size={20} color="#fff" />
-                        )}
-                    </TouchableOpacity>
+                <View style={styles.header}>
+                    <Text style={styles.headerTitle}>AmPac Assistant</Text>
+                    <View style={styles.badge}>
+                        <Text style={styles.badgeText}>BETA</Text>
+                    </View>
                 </View>
-                <Text style={styles.disclaimer}>
-                    AmPac Brain can make mistakes. Please verify important info.
-                </Text>
+
+                <FlatList
+                    ref={flatListRef}
+                    data={messages}
+                    renderItem={renderItem}
+                    keyExtractor={item => item.id}
+                    contentContainerStyle={styles.listContent}
+                    onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+                    onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
+                />
+
+                {error && (
+                    <View style={styles.errorContainer}>
+                        <Text style={styles.errorText}>{error}</Text>
+                    </View>
+                )}
+
+                <View style={styles.inputContainer}>
+                    <View style={styles.inputWrapper}>
+                        <TextInput
+                            style={styles.input}
+                            value={inputText}
+                            onChangeText={setInputText}
+                            placeholder="Type a message..."
+                            placeholderTextColor={theme.colors.textSecondary}
+                            multiline
+                        />
+                        <TouchableOpacity
+                            style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
+                            onPress={handleSend}
+                            disabled={!inputText.trim() || isLoading}
+                        >
+                            {isLoading ? (
+                                <ActivityIndicator size="small" color="#fff" />
+                            ) : (
+                                <Ionicons name="arrow-up" size={20} color="#fff" />
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                    <Text style={styles.disclaimer}>
+                        AmPac Brain can make mistakes. Please verify important info.
+                    </Text>
+                </View>
             </KeyboardAvoidingView>
         </SafeAreaView>
     );
