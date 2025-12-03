@@ -17,13 +17,18 @@ export const msalConfig: Configuration = {
 // Scopes for the Console application
 // Base: User.Read (Profile), Calendars.Read (View Calendar)
 // Elevated: Mail.Read (View Emails), Calendars.ReadWrite (Schedule Meetings), Mail.Send (Send Emails)
+// Enterprise: Files.ReadWrite (SharePoint), Tasks.ReadWrite (Planner), GroupMember.Read.All (RBAC)
 export const loginRequest: PopupRequest = {
     scopes: [
         "User.Read",
         "Calendars.ReadWrite",
         "Mail.Read",
         "Mail.Send",
-        "People.Read" // For searching contacts
+        "People.Read",
+        "Files.ReadWrite",
+        "Tasks.ReadWrite",
+        "GroupMember.Read.All",
+        "offline_access"
     ]
 };
 

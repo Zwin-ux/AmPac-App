@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Activity, AlertTriangle, CheckCircle, Clock, RefreshCw, Search, Link } from 'lucide-react';
 import { venturesService } from '../services/venturesService';
 import VenturesConnectionModal from '../components/ventures/VenturesConnectionModal';
+import { ConnectM365Button } from '../components/ConnectM365Button';
+import { M365Widgets } from '../components/dashboard/DashboardWidgets';
 import type { VenturesSyncLog } from '../types';
 
 export default function VenturesDashboard() {
@@ -36,8 +38,8 @@ export default function VenturesDashboard() {
 
     return (
         <div className="p-6 max-w-7xl mx-auto">
-            <VenturesConnectionModal 
-                isOpen={isModalOpen} 
+            <VenturesConnectionModal
+                isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 onSuccess={() => {
                     loadData();
@@ -51,8 +53,9 @@ export default function VenturesDashboard() {
                     <p className="text-textSecondary">Operational overview of LOS integration</p>
                 </div>
                 <div className="flex gap-2">
+                    <ConnectM365Button />
                     {!isConnected ? (
-                        <button 
+                        <button
                             onClick={() => setIsModalOpen(true)}
                             className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 flex items-center gap-2 shadow-sm"
                         >
@@ -63,13 +66,18 @@ export default function VenturesDashboard() {
                             <CheckCircle className="w-4 h-4" /> Connected as {config.username}
                         </div>
                     )}
-                    <button 
+                    <button
                         onClick={loadData}
                         className="px-4 py-2 bg-white border border-border rounded text-sm font-medium hover:bg-gray-50 flex items-center gap-2"
                     >
                         <RefreshCw className="w-4 h-4" /> Refresh
                     </button>
                 </div>
+            </div>
+
+            {/* M365 Widgets */}
+            <div className="mb-8">
+                <M365Widgets />
             </div>
 
             {/* Metrics Cards */}
@@ -165,8 +173,8 @@ export default function VenturesDashboard() {
                                     </td>
                                     <td className="px-6 py-4">
                                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${log.status === 'success' ? 'bg-green-100 text-green-800' :
-                                                log.status === 'validation_error' ? 'bg-yellow-100 text-yellow-800' :
-                                                    'bg-red-100 text-red-800'
+                                            log.status === 'validation_error' ? 'bg-yellow-100 text-yellow-800' :
+                                                'bg-red-100 text-red-800'
                                             }`}>
                                             {log.status === 'success' && <CheckCircle className="w-3 h-3" />}
                                             {log.status === 'validation_error' && <AlertTriangle className="w-3 h-3" />}
