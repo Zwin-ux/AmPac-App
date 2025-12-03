@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { onAuthStateChanged, type User } from 'firebase/auth';
-import { auth } from './firebaseConfig';
+import { useIsAuthenticated, useMsal } from "@azure/msal-react";
 import LoginPage from './pages/LoginPage';
 import WorkboardPage from './pages/WorkboardPage';
 import ApplicationDetailPage from './pages/ApplicationDetailPage';
@@ -9,34 +8,31 @@ import AdminPage from './pages/AdminPage';
 import VenturesDashboard from './pages/VenturesDashboard';
 import BrainPage from './pages/BrainPage';
 import DashboardLayout from './layouts/DashboardLayout';
+import { useNotifications } from './hooks/useNotifications';
 
 function RequireAuth({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const isAuthenticated = useIsAuthenticated();
+  const { instance } = useMsal();
+  const [isDevBypass, setIsDevBypass] = useState(false);
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    // Check for dev bypass
-    const isDevBypass = localStorage.getItem('ampac_dev_bypass') === 'true';
-    if (isDevBypass) {
-      setUser({ uid: 'dev-user', email: 'dev@ampac.com' } as User);
-      setLoading(false);
-      return;
-    }
+    const bypass = localStorage.getItem('ampac_dev_bypass') === 'true';
+    setIsDevBypass(bypass);
+    
+    // If not authenticated and not bypass, try silent SSO if possible or just finish checking
+    // MSAL handles its own loading state usually, but we need to combine it with our bypass logic
+    setChecking(false);
+  }, [isAuthenticated]);
 
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
-    });
-    return unsubscribe;
-  }, []);
+  if (checking) return <div className="min-h-screen flex items-center justify-center bg-surfaceHighlight text-textSecondary">Loading...</div>;
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-surfaceHighlight text-textSecondary">Loading...</div>;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!isAuthenticated && !isDevBypass) {
+    return <Navigate to="/login" replace />;
+  }
 
   return children;
 }
-
-import { useNotifications } from './hooks/useNotifications';
 
 export default function App() {
   useNotifications();

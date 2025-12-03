@@ -1,23 +1,30 @@
 import { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Users, FileText, Settings, LogOut, Menu, X, Activity, Brain } from 'lucide-react';
-import { getAuth, signOut } from 'firebase/auth';
-import { app } from '../firebaseConfig';
+import { useMsal } from "@azure/msal-react";
 import CopilotSidebar from '../components/CopilotSidebar';
 
 export default function DashboardLayout() {
     const navigate = useNavigate();
     const location = useLocation();
-    const auth = getAuth(app);
+    const { instance } = useMsal();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     const handleLogout = async () => {
         try {
-            await signOut(auth);
+            // Clear dev bypass flag
             localStorage.removeItem('ampac_dev_bypass');
+            
+            // Attempt MSAL logout if active
+            const account = instance.getActiveAccount();
+            if (account) {
+                await instance.logoutPopup();
+            }
+            
             navigate('/login');
         } catch (error) {
             console.error("Error signing out:", error);
+            navigate('/login');
         }
     };
 
