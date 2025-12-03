@@ -19,13 +19,19 @@ class ConfigureRequest(BaseModel):
     password: str
     site_name: str
 
+from app.services.token_storage import TokenStorage
+
+token_storage = TokenStorage()
+
 @router.post("/configure")
-async def configure_ventures(config: ConfigureRequest):
+async def configure_ventures(config: ConfigureRequest, user_id: str = "demo_user"): # TODO: Get real user_id from auth dependency
     """
-    Validates credentials and saves them encrypted to Firestore.
+    Validates credentials and saves them encrypted to Firestore for the user.
     """
     try:
-        # 1. Validate by attempting login
+        # 1. Validate by attempting login (Optional, but good UX)
+        # For "Zero-Config", we might skip validation if we trust the user, 
+        # but validation prevents bad states.
         temp_client = VenturesClient(
             username=config.username, 
             password=config.password, 
@@ -36,21 +42,19 @@ async def configure_ventures(config: ConfigureRequest):
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Authentication failed: {str(e)}")
 
-        # 2. Encrypt password
-        encrypted_pw = encryption_service.encrypt(config.password)
-
-        # 3. Save to Firestore
-        db = firestore.client()
-        db.collection("system_secrets").document("ventures_config").set({
+        # 2. Save to TokenStorage (User-specific vault)
+        await token_storage.save_ventures_creds(user_id, {
             "username": config.username,
-            "encrypted_password": encrypted_pw,
-            "site_name": config.site_name,
-            "updated_at": firestore.SERVER_TIMESTAMP
+            "password": config.password,
+            "site": config.site_name
         })
 
-        # 4. Reload the global client
-        ventures_client._load_config()
-
+        # 3. Reload global client? 
+        # No, the global client is likely for a system account. 
+        # For user-specific actions, we should instantiate a client per request using stored creds.
+        # But for now, we'll keep the existing pattern if it relies on a singleton, 
+        # OR we just acknowledge the config is saved.
+        
         return {"success": True, "message": "Ventures integration configured successfully"}
     except HTTPException:
         raise
@@ -58,23 +62,20 @@ async def configure_ventures(config: ConfigureRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/config/status")
-async def get_config_status():
+async def get_config_status(user_id: str = "demo_user"):
     """
-    Checks if Ventures is configured.
+    Checks if Ventures is configured for the user.
     """
     try:
-        db = firestore.client()
-        doc = db.collection("system_secrets").document("ventures_config").get()
-        if doc.exists:
-            data = doc.to_dict()
+        creds = await token_storage.get_ventures_creds(user_id)
+        if creds:
             return {
                 "configured": True,
-                "username": data.get("username"),
-                "site_name": data.get("site_name")
+                "username": creds.get("username"),
+                "site_name": creds.get("site")
             }
         return {"configured": False}
     except Exception as e:
-        # If Firestore fails (e.g. permissions), assume not configured or error
         print(f"Error checking status: {e}")
         return {"configured": False, "error": str(e)}
 

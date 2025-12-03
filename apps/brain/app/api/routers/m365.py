@@ -5,10 +5,100 @@ from app.services.graph_service import GraphService
 from app.services.llm_service import LLMService
 from app.services.doc_parser import DocumentParser
 
+from app.core.config import get_settings
+from app.services.token_storage import TokenStorage
+import httpx
+
 router = APIRouter()
+settings = get_settings()
 # Force Rebuild for Real Intelligence
 graph_service = GraphService()
 llm_service = LLMService()
+token_storage = TokenStorage()
+
+class AuthExchangeRequest(BaseModel):
+    code: str
+    redirect_uri: str
+
+@router.get("/auth/login_url")
+async def get_login_url(redirect_uri: str):
+    """
+    Returns the URL to initiate the OAuth flow.
+    """
+    if not settings.AZURE_CLIENT_ID or not settings.AZURE_TENANT_ID:
+        raise HTTPException(status_code=500, detail="Azure credentials not configured")
+        
+    scopes = "User.Read Mail.ReadWrite Calendars.ReadWrite Files.ReadWrite.All offline_access"
+    url = (
+        f"https://login.microsoftonline.com/{settings.AZURE_TENANT_ID}/oauth2/v2.0/authorize"
+        f"?client_id={settings.AZURE_CLIENT_ID}"
+        f"&response_type=code"
+        f"&redirect_uri={redirect_uri}"
+        f"&response_mode=query"
+        f"&scope={scopes}"
+        f"&state=12345" # In prod, use random state
+    )
+    return {"url": url}
+
+@router.post("/auth/exchange")
+async def exchange_token(request: AuthExchangeRequest):
+    """
+    Exchanges auth code for tokens and stores them.
+    """
+    # In a real app, we'd get the current user from the dependency
+    # For now, we'll hardcode a demo user or extract from a header if we had auth middleware
+    user_id = "demo_user" 
+    
+    token_url = f"https://login.microsoftonline.com/{settings.AZURE_TENANT_ID}/oauth2/v2.0/token"
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.post(token_url, data={
+            "client_id": settings.AZURE_CLIENT_ID,
+            "client_secret": settings.AZURE_CLIENT_SECRET,
+            "grant_type": "authorization_code",
+            "code": request.code,
+            "redirect_uri": request.redirect_uri,
+        })
+        
+        if response.status_code != 200:
+            raise HTTPException(status_code=400, detail=f"Token exchange failed: {response.text}")
+            
+        data = response.json()
+        
+        # Save to Firestore
+        await token_storage.save_tokens(user_id, {
+            "access_token": data.get("access_token"),
+            "refresh_token": data.get("refresh_token"),
+            "expires_at": data.get("expires_in"), # This is relative seconds, ideally calculate absolute
+            "scope": data.get("scope")
+        })
+        
+        return {"status": "connected", "user_id": user_id}
+
+@router.get("/status")
+async def get_status():
+    user_id = "demo_user"
+    tokens = await token_storage.get_tokens(user_id)
+    return {"connected": tokens is not None}
+
+
+@router.get("/dashboard")
+async def get_dashboard_data(user_id: str = "demo_user"):
+    """
+    Fetches recent emails and upcoming events for the dashboard.
+    """
+    # Run in parallel
+    import asyncio
+    emails, events = await asyncio.gather(
+        graph_service.get_recent_emails(user_id),
+        graph_service.get_upcoming_events(user_id)
+    )
+    
+    return {
+        "emails": emails,
+        "events": events
+    }
+
 
 class DraftEmailRequest(BaseModel):
     appId: str

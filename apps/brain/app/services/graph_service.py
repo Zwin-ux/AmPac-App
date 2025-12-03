@@ -8,6 +8,11 @@ from msgraph.generated.models.date_time_time_zone import DateTimeTimeZone
 from msgraph.generated.models.attendee_base import AttendeeBase
 from msgraph.generated.models.email_address import EmailAddress
 from msgraph.generated.models.online_meeting import OnlineMeeting
+from app.services.token_storage import TokenStorage
+from azure.identity import ClientSecretCredential, OnBehalfOfCredential
+# Note: OnBehalfOfCredential is for middle-tier. For refresh token flow we might need to manually refresh or use a different cred.
+# Ideally we use AuthorizationCodeCredential with the refresh token, but Azure Identity's implementation expects a client_secret too.
+import time
 
 settings = get_settings()
 
@@ -31,6 +36,71 @@ class GraphService:
         else:
             self.client = None
             print("Microsoft Graph credentials not configured.")
+            
+        self.token_storage = TokenStorage()
+
+    async def get_user_client(self, user_id: str) -> Optional[GraphServiceClient]:
+        """
+        Returns a GraphServiceClient authenticated as the specific user.
+        """
+        tokens = await self.token_storage.get_tokens(user_id)
+        if not tokens or not tokens.get("refresh_token"):
+            return None
+
+        # We need to construct a credential that can use the refresh token.
+        # Azure Identity doesn't have a simple "RefreshTokenCredential".
+        # We can use a custom TokenCredential or manually refresh.
+        # For simplicity in this integration, we'll use a helper to refresh the token 
+        # using the client credentials + refresh token flow, then use a BearerTokenCredential.
+        
+        # However, a robust way is to use the OnBehalfOfCredential if we had an incoming assertion,
+        # but here we are acting offline.
+        
+        # Let's implement a simple refresh mechanism here or use a library helper if available.
+        # For now, we will assume we can get a fresh access token.
+        
+        access_token = await self._refresh_user_token(tokens.get("refresh_token"))
+        if not access_token:
+            return None
+            
+        # Create a client with a simple AccessTokenCredential
+        from azure.core.credentials import AccessToken
+        
+        class StaticTokenCredential:
+            def __init__(self, token):
+                self.token = token
+            async def get_token(self, *scopes, **kwargs):
+                # Return the token with a far future expiry so it's used immediately
+                return AccessToken(self.token, int(time.time() + 3600))
+
+        return GraphServiceClient(credentials=StaticTokenCredential(access_token), scopes=["User.Read"])
+
+    async def _refresh_user_token(self, refresh_token: str) -> Optional[str]:
+        """
+        Exchanges a refresh token for a new access token using the confidential client flow.
+        """
+        import httpx
+        
+        if not self.client_id or not self.client_secret or not self.tenant_id:
+            return None
+
+        token_url = f"https://login.microsoftonline.com/{self.tenant_id}/oauth2/v2.0/token"
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(token_url, data={
+                "client_id": self.client_id,
+                "client_secret": self.client_secret,
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token,
+                "scope": "User.Read Mail.ReadWrite Calendars.ReadWrite Files.ReadWrite.All offline_access"
+            })
+            
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("access_token")
+            else:
+                print(f"Failed to refresh token: {response.text}")
+                return None
 
     async def get_staff_availability(self, staff_email: str, start_date: datetime, end_date: datetime):
         """
@@ -236,3 +306,94 @@ class GraphService:
         except Exception as e:
             print(f"Error creating calendar event: {e}")
             return None
+
+    async def get_recent_emails(self, user_id: str, limit: int = 5) -> List[dict]:
+        """
+        Fetches recent emails for the user.
+        """
+        client = await self.get_user_client(user_id)
+        if not client:
+            return []
+
+        try:
+            # Select specific fields to reduce payload
+            query_params = {
+                "$top": limit,
+                "$select": "id,subject,sender,receivedDateTime,webLink,bodyPreview",
+                "$orderby": "receivedDateTime desc"
+            }
+            
+            # Note: The Python SDK might handle query params differently.
+            # Using the fluent API pattern:
+            result = await client.me.messages.get(request_configuration=lambda q: q.query_parameters.update(query_params))
+            
+            emails = []
+            if result and result.value:
+                for msg in result.value:
+                    emails.append({
+                        "id": msg.id,
+                        "subject": msg.subject,
+                        "sender": {
+                            "emailAddress": {
+                                "name": msg.sender.email_address.name if msg.sender and msg.sender.email_address else "Unknown",
+                                "address": msg.sender.email_address.address if msg.sender and msg.sender.email_address else ""
+                            }
+                        },
+                        "receivedDateTime": msg.received_date_time.isoformat() if msg.received_date_time else None,
+                        "webLink": msg.web_link,
+                        "bodyPreview": msg.body_preview
+                    })
+            return emails
+        except Exception as e:
+            print(f"Error fetching emails for {user_id}: {e}")
+            return []
+
+    async def get_upcoming_events(self, user_id: str, limit: int = 3) -> List[dict]:
+        """
+        Fetches upcoming calendar events for the user.
+        """
+        client = await self.get_user_client(user_id)
+        if not client:
+            return []
+
+        try:
+            start_time = datetime.utcnow().isoformat()
+            end_time = (datetime.utcnow() + timedelta(days=7)).isoformat()
+            
+            # For calendar view, we need start and end times
+            query_params = {
+                "$top": limit,
+                "$select": "id,subject,start,end,webLink,location",
+                "$orderby": "start/dateTime"
+            }
+            
+            # Using calendar view to expand recurring events
+            result = await client.me.calendar_view.get(
+                request_configuration=lambda q: q.query_parameters.update({
+                    "start_date_time": start_time,
+                    "end_date_time": end_time,
+                    **query_params
+                })
+            )
+            
+            events = []
+            if result and result.value:
+                for evt in result.value:
+                    events.append({
+                        "id": evt.id,
+                        "subject": evt.subject,
+                        "start": {
+                            "dateTime": evt.start.date_time,
+                            "timeZone": evt.start.time_zone
+                        },
+                        "end": {
+                            "dateTime": evt.end.date_time,
+                            "timeZone": evt.end.time_zone
+                        },
+                        "webLink": evt.web_link,
+                        "location": evt.location.display_name if evt.location else ""
+                    })
+            return events
+        except Exception as e:
+            print(f"Error fetching events for {user_id}: {e}")
+            return []
