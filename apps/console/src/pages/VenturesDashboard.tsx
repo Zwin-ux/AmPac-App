@@ -168,7 +168,7 @@ export default function VenturesDashboard() {
                                     </td>
                                     <td className="px-6 py-4 capitalize">
                                         <span className="px-2 py-1 rounded bg-gray-100 text-xs font-medium">
-                                            {log.mode.replace('_', ' ')}
+                                            {log.mode?.replace('_', ' ') || 'Unknown'}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4">
@@ -179,7 +179,7 @@ export default function VenturesDashboard() {
                                             {log.status === 'success' && <CheckCircle className="w-3 h-3" />}
                                             {log.status === 'validation_error' && <AlertTriangle className="w-3 h-3" />}
                                             {log.status === 'failed' && <AlertTriangle className="w-3 h-3" />}
-                                            {log.status.replace('_', ' ')}
+                                            {log.status?.replace('_', ' ') || 'Unknown'}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-textSecondary max-w-xs truncate">
