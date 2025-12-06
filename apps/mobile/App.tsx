@@ -79,6 +79,9 @@ function MainTabs() {
       >
         <Tab.Screen name="HomeTab" component={HomeScreen} options={{ title: 'Home' }} />
         <Tab.Screen name="Apply" component={ApplicationScreen} />
+        <Tab.Screen name="Spaces" component={SpacesNavigator} />
+        <Tab.Screen name="Network" component={NetworkScreen} />
+        <Tab.Screen name="Support" component={HotlineScreen} />
         {/* Feature Flag: Borrower Concierge */}
         <Tab.Screen
           name="Assistant"

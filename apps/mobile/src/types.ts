@@ -344,3 +344,14 @@ export interface Business {
     imageUrl?: string;
     ownerName?: string;
 }
+
+export interface Event {
+    id: string;
+    title: string;
+    description: string;
+    date: string; // ISO string
+    location: string;
+    organizerId: string;
+    organizerName: string;
+    attendees: string[]; // User IDs
+}
