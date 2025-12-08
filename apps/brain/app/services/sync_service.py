@@ -93,6 +93,7 @@ class SyncService:
 
         while True:
             try:
+                await self.sync_applications_upstream()
                 await self.sync_loan_statuses()
                 await self.sync_tasks()
                 await self.sync_uploads_to_ventures()
@@ -138,6 +139,41 @@ class SyncService:
                     apps_ref.add(new_app)
         except Exception as e:
             print(f"Error seeding data: {e}")
+
+    async def sync_applications_upstream(self):
+        """
+        Pushes new 'submitted' applications from Firestore to Ventures (Upstream).
+        """
+        try:
+            apps_ref = self.db.collection("applications")
+            # Find apps that are 'submitted' but have no venturesLoanId yet
+            # Note: Firestore doesn't support "where field is missing", so we check empty string or manually filter if needed.
+            # Assuming our app creation logic sets venturesLoanId="" initially.
+            docs = apps_ref.where("status", "==", ApplicationStatus.SUBMITTED).where("venturesLoanId", "==", "").stream()
+
+            for doc in docs:
+                app_data = doc.to_dict()
+                print(f"Syncing Application Upstream: {doc.id}")
+                
+                # 1. Create in Ventures
+                try:
+                    new_loan = await self.ventures_client.create_loan(app_data)
+                    
+                    # 2. Update Firestore with new ID and move to Underwriting
+                    apps_ref.document(doc.id).update({
+                        "venturesLoanId": new_loan.id,
+                        "status": "underwriting", # Instant intake
+                        "venturesStatus": new_loan.status_name,
+                        "lastSyncedAt": datetime.utcnow()
+                    })
+                    self.log_event("success", f"Created Ventures Loan {new_loan.id} for App {doc.id}")
+                except Exception as e:
+                    print(f"Failed to create loan in Ventures: {e}")
+                    self.log_event("error", f"Upstream sync failed for {doc.id}: {e}")
+
+        except Exception as e:
+            print(f"Error syncing applications upstream: {e}")
+            self.log_event("error", f"Sync applications upstream failed: {e}")
 
     async def sync_loan_statuses(self):
         """
@@ -270,9 +306,6 @@ class SyncService:
         try:
             # Find tasks that are completed but have a venturesConditionId
             tasks_ref = self.db.collection("tasks")
-            # Query for completed tasks
-            # Note: Complex queries might need index. 
-            # For now, let's iterate active loans and their tasks to be safe/simple for this scale.
             
             apps_ref = self.db.collection("applications")
             docs = apps_ref.where("venturesLoanId", "!=", "").stream()
@@ -290,14 +323,15 @@ class SyncService:
                     if not cond_id:
                         continue
                         
-                    # Check current status in Ventures (via our client cache/fetch)
-                    # Optimization: We could fetch all conditions once per loan, but get_conditions is fast/mocked.
+                    # Check current status in Ventures
                     conditions = await self.ventures_client.get_conditions(ventures_id)
                     matching_cond = next((c for c in conditions if c.id == cond_id), None)
                     
                     if matching_cond and matching_cond.status == "Open":
                         print(f"Pushing Upload Status to Ventures: {cond_id} -> Received")
-                        await self.ventures_client.update_condition_status(cond_id, "Received")
+                        # Use the specific upload_document semantic method
+                        file_url = task_data.get("fileUrl", "unknown_url") # Expect fileUrl in task
+                        await self.ventures_client.upload_document(ventures_id, cond_id, file_url)
                         self.log_event("success", f"Marked condition {cond_id} as Received in Ventures")
 
         except Exception as e:

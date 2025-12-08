@@ -35,6 +35,40 @@ class MockVenturesClient(AbstractVenturesClient):
                     return True
         return False
 
+    async def create_loan(self, loan_data: dict) -> VenturesLoan:
+        import random
+        # Generate new ID
+        new_id = f"V-{random.randint(1000, 9999)}"
+        
+        # Create Loan Object
+        new_loan = VenturesLoan(
+            id=new_id,
+            status_name="Underwriting", # Default new status
+            balance=float(loan_data.get("amount", 0.0)),
+            officer_name="Unassigned",
+            borrower_name=loan_data.get("businessName", "New Borrower")
+        )
+        
+        # Add to state
+        self._loans[new_id] = new_loan
+        
+        # Add default conditions
+        self._conditions[new_id] = [
+            VenturesCondition(id=f"c-{random.randint(10000, 99999)}", description="2023 Tax Returns", status="Open", category="Financials"),
+            VenturesCondition(id=f"c-{random.randint(10000, 99999)}", description="Articles of Incorporation", status="Open", category="Legal"),
+        ]
+        
+        self._persist_state()
+        print(f"[MockVentures] Created Loan {new_id} for {new_loan.borrower_name}")
+        return new_loan
+
+    async def upload_document(self, loan_id: str, condition_id: str, file_url: str) -> bool:
+        """
+        Simulates uploading a document by marking the condition as Received.
+        """
+        print(f"[MockVentures] Uploading document to {loan_id}/{condition_id}: {file_url}")
+        return await self.update_condition_status(condition_id, "Received", note=f"File uploaded: {file_url}")
+
     # --- Persistence helpers ---
 
     def _default_loans(self) -> Dict[str, VenturesLoan]:

@@ -1,5 +1,5 @@
 from app.services.llm_service import llm_service
-from app.services.graph_client import graph_client
+from app.services.graph_service import graph_service
 import asyncio
 
 class StaffCopilotAgent:

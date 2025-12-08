@@ -1,19 +1,8 @@
-fastapi
-uvicorn
-python-dotenv
-firebase-admin
-openai
-langchain
-langchain-openai
-pydantic
-httpx
-azure-identity
-msgraph-core
-msgraph-sdk
-pydantic-settings
-cryptography
-# Document Processing
-pdfplumber==0.10.3
-openpyxl==3.1.2
-pandas
-python-multipart==0.0.6
+fastapi==0.109.0
+uvicorn==0.27.0
+firebase-admin==6.4.0
+httpx==0.26.0
+python-multipart==0.0.9
+msgraph-sdk==1.0.0
+azure-identity==1.15.0
+pydantic-settings==2.1.0

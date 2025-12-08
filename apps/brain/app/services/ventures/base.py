@@ -34,3 +34,11 @@ class AbstractVenturesClient(ABC):
     @abstractmethod
     async def update_condition_status(self, condition_id: str, status: str, note: Optional[str] = None) -> bool:
         pass
+
+    @abstractmethod
+    async def create_loan(self, loan_data: dict) -> VenturesLoan:
+        pass
+
+    @abstractmethod
+    async def upload_document(self, loan_id: str, condition_id: str, file_url: str) -> bool:
+        pass

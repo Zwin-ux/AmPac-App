@@ -10,6 +10,7 @@ import { Application, SyncStatus, Task } from '../types';
 
 import SyncStatusBadge from '../components/SyncStatusBadge';
 import QuickApplySheet from '../components/QuickApplySheet';
+import AssistantBubble from '../components/AssistantBubble';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { buildStoragePath, pickDocument, uploadFileFromUri } from '../services/upload';

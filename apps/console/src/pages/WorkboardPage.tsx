@@ -17,15 +17,18 @@ export default function WorkboardPage() {
     const navigate = useNavigate();
 
     useEffect(() => {
-        fetchPipeline();
-    }, []);
-
-    const fetchPipeline = async () => {
+        console.log('Subscribing to pipeline...');
         setLoading(true);
-        const data = await loanService.getPipeline();
-        setApplications(data);
-        setLoading(false);
-    };
+        const unsubscribe = loanService.subscribeToPipeline({}, (data) => {
+            console.log('Pipeline updated:', data.length);
+            setApplications(data);
+            setLoading(false);
+        });
+
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
+    }, []);
 
     const handleCardClick = (id: string) => {
         navigate(`/applications/${id}`);
@@ -42,12 +45,7 @@ export default function WorkboardPage() {
                     <h1 className="text-2xl font-bold text-gray-900">Pipeline Workboard</h1>
                     <p className="text-sm text-gray-500">Real-time view of all active applications</p>
                 </div>
-                <button
-                    onClick={fetchPipeline}
-                    className="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                    Refresh
-                </button>
+                {/* Real-time view, no refresh needed */}
             </header>
 
             <MyWorkPanel />

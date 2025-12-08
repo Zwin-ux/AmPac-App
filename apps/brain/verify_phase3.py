@@ -15,6 +15,9 @@ async def verify_dashboard():
                 print("✅ Dashboard Stats:", data)
             else:
                 print(f"❌ Failed: {response.status_code} {response.text}")
+        except httpx.ConnectError:
+            print("❌ Error: Could not connect to Brain service.")
+            print("💡 Tip: Is the server running? (Run: `python -m uvicorn apps.brain.app.main:app --reload`)")
         except Exception as e:
             print(f"❌ Error: {e}")
 

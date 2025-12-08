@@ -263,7 +263,10 @@ class GraphService:
         Creates a calendar event on the organizer's calendar.
         """
         if not self.client:
-            return None
+            return {
+                "eventId": "mock-event-id-" + str(int(time.time())),
+                "joinUrl": "https://teams.microsoft.com/l/meetup-join/mock-link"
+            }
 
         try:
             from msgraph.generated.models.event import Event
@@ -397,3 +400,5 @@ class GraphService:
         except Exception as e:
             print(f"Error fetching events for {user_id}: {e}")
             return []
+
+graph_service = GraphService()

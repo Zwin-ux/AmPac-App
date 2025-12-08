@@ -7,7 +7,9 @@ import {
     where,
     orderBy,
     updateDoc,
-    Timestamp
+    Timestamp,
+    onSnapshot,
+    Unsubscribe
 } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import type { Application, ApplicationStatus, ApplicationFlag } from '../types';
@@ -38,6 +40,35 @@ export const loanService = {
         } catch (error) {
             console.error("Error fetching pipeline:", error);
             return [];
+        }
+    },
+
+    /**
+     * Subscribe to pipeline changes
+     */
+    subscribeToPipeline(
+        filters: { status?: ApplicationStatus; assignedTo?: string; limit?: number } | undefined,
+        onUpdate: (apps: Application[]) => void
+    ): Unsubscribe | null {
+        try {
+            let q = query(collection(db, COLLECTION), orderBy('lastUpdated', 'desc'));
+
+            if (filters?.status) {
+                q = query(q, where('status', '==', filters.status));
+            }
+            if (filters?.assignedTo) {
+                q = query(q, where('assignedTo', '==', filters.assignedTo));
+            }
+
+            return onSnapshot(q, (snapshot) => {
+                const apps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Application));
+                onUpdate(apps);
+            }, (error) => {
+                console.error("Error subscribing to pipeline:", error);
+            });
+        } catch (error) {
+            console.error("Error setting up subscription:", error);
+            return null;
         }
     },
 

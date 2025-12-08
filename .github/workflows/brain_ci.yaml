@@ -1,0 +1,40 @@
+name: Brain Service CI
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'apps/brain/**'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'apps/brain/**'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: ./apps/brain
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        # Install test dependencies if any (e.g. pytest)
+        # pip install pytest httpx
+
+    - name: Run Basic Health Check / Lint
+      run: |
+        # In the future, run pytest here.
+        # For now, just ensure it imports correctly
+        python -c "import app.main; print('Successfully imported app.main')"

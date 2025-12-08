@@ -35,21 +35,28 @@ export default function HomeScreen() {
         };
     }, []);
 
-    // 2. Fetch Applications (Run when user changes)
+    // 2. Subscribe to Applications (Real-time)
     useEffect(() => {
-        const fetchApps = async () => {
+        let unsubscribe: (() => void) | undefined;
+
+        const setupSubscription = async () => {
             if (user?.uid) {
-                const { getUserApplications } = await import('../services/applications');
-                const apps = await getUserApplications(user.uid);
-                const active = apps.find(a => a.status !== 'withdrawn' && a.status !== 'declined') || null;
-                setActiveApplication(active);
+                const { subscribeToApplications } = await import('../services/applications');
+                unsubscribe = subscribeToApplications(user.uid, (apps) => {
+                    const active = apps.find(a => a.status !== 'withdrawn' && a.status !== 'declined') || null;
+                    setActiveApplication(active);
+                });
             }
         };
 
         if (user?.uid) {
-            fetchApps();
+            setupSubscription();
         }
-    }, [user?.uid]); // Only depend on UID to avoid deep object comparison issues
+
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
+    }, [user?.uid]);
 
     const userName = user?.fullName?.split(' ')[0] || 'Entrepreneur';
 
