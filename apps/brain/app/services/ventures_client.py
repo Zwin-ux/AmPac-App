@@ -49,12 +49,11 @@ class VenturesClient:
             "password": self.password
         }
         
-        async with httpx.AsyncClient() as client:
-            # For demo purposes, if we are in dev and using mock creds, return a fake token
-            if self.username == "mock_user":
-                self.token = "mock_token_123"
-                return self.token
+        if settings.VENTURES_MOCK_MODE:
+            self.token = f"mock_token_{self.username}"
+            return self.token
 
+        async with httpx.AsyncClient() as client:
             response = await client.post(url, json=payload)
             response.raise_for_status()
             try:

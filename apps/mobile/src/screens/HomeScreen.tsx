@@ -144,6 +144,26 @@ export default function HomeScreen() {
 
                     <TouchableOpacity
                         style={styles.actionCard}
+                        onPress={() => navigation.navigate('Payment')}
+                    >
+                        <View style={[styles.iconContainer, { backgroundColor: '#E3F2FD' }]}>
+                            <Ionicons name="card" size={24} color="#1565C0" />
+                        </View>
+                        <Text style={styles.actionLabel}>Payments</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.actionCard}
+                        onPress={() => navigation.navigate('Feed')}
+                    >
+                        <View style={[styles.iconContainer, { backgroundColor: '#FEF3C7' }]}>
+                            <Ionicons name="newspaper" size={24} color="#D97706" />
+                        </View>
+                        <Text style={styles.actionLabel}>Feed</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.actionCard}
                         onPress={() => navigation.navigate('Network')}
                     >
                         <View style={[styles.iconContainer, { backgroundColor: '#F3E5F5' }]}>

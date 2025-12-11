@@ -11,6 +11,14 @@ AmPac-App is a mobile application for the Asian & Pacific Islander American Cham
 - **Business Network**: Ecosystem for connecting entrepreneurs with partners and resources
 - **Business Profiles**: Showcase and discover businesses within the AmPac community
 
+## Staff Ecosystem (The Connected Workplace)
+
+- **AmPac Console**: "Mission Control" for lending staff, deep-linking into M365.
+- **M365 Integration**:
+  - **Outlook**: "Loan Inbox" context and AI-drafted emails.
+  - **Teams**: Automated "Deal Rooms" for collaboration.
+- **AmPac Brain**: AI Agent layer for document processing (IDP) and policy questions.
+
 ## Target Users
 
 - **Entrepreneurs**: Small business owners seeking funding, mentorship, and resources

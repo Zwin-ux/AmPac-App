@@ -3,16 +3,17 @@
 ## Monorepo Layout
 
 ```
-apps/mobile/          # Main mobile application
-├── src/              # Source code
-├── assets/           # Images and static resources
-├── functions/        # Firebase Cloud Functions
-└── dataconnect/      # Firebase Data Connect (GraphQL)
+apps/
+├── mobile/           # React Native Mobile App (Borrowers)
+├── console/          # React Admin Dashboard (Staff)
+├── brain/            # Python FastAPI Service (AI/Backend)
+└── m365-addin/       # Outlook/Teams Manifest
 ```
 
 ## Source Organization
 
 ### `/src/screens/`
+
 Screen components for each route in the app. Each screen is a self-contained component with its own styles.
 
 - Authentication: SignInScreen, SignUpScreen
@@ -20,12 +21,14 @@ Screen components for each route in the app. Each screen is a self-contained com
 - Detail views: RoomDetailScreen, BusinessProfileScreen
 
 ### `/src/components/`
+
 Reusable UI components used across multiple screens.
 
 - AssistantBubble: Floating AI assistant interface
 - SkeletonLoader: Loading state placeholder
 
 ### `/src/services/`
+
 Business logic and external service integrations.
 
 - `firestore.ts`: Firestore database operations
@@ -35,9 +38,11 @@ Business logic and external service integrations.
 - `cache.ts`: Local caching utilities
 
 ### `/src/types.ts`
+
 Centralized TypeScript type definitions for the entire app. All interfaces and types are defined here.
 
 ### `/src/theme.ts`
+
 Design system with colors, spacing, typography, border radius, and shadows. Import and use throughout the app for consistent styling.
 
 ## Navigation Architecture

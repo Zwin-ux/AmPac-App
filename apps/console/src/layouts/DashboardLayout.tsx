@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, FileText, Settings, LogOut, Menu, X, Activity, Brain } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Settings, LogOut, Menu, X, Activity, Brain, CreditCard, MessageSquare } from 'lucide-react';
 import { useMsal } from "@azure/msal-react";
 import CopilotSidebar from '../components/CopilotSidebar';
 
@@ -34,6 +34,8 @@ export default function DashboardLayout() {
         { icon: FileText, label: 'Applications', path: '/search' },
         { icon: Activity, label: 'Ventures', path: '/ventures' },
         { icon: Brain, label: 'Brain Console', path: '/brain' },
+        { icon: CreditCard, label: 'Payments', path: '/payments' },
+        { icon: MessageSquare, label: 'Teams', path: '/teams' },
         { icon: Settings, label: 'Settings', path: '/settings' },
     ];
 

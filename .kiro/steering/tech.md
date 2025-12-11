@@ -12,14 +12,29 @@
 - **React Navigation v7**: Native stack and bottom tab navigators
 - **SafeAreaProvider**: Safe area context for notch/status bar handling
 
-## Backend & Services
+## Cloud Infrastructure (Azure)
 
-- **Firebase**: Complete backend solution
-  - Authentication with AsyncStorage persistence
-  - Firestore for database
-  - Analytics (when supported)
-  - Cloud Functions (Node.js/TypeScript)
-- **Firebase Data Connect**: GraphQL-based data layer (configured but not actively used)
+- **Compute**:
+  - **Azure Container Apps**: Hosting for `apps/brain` (Python/FastAPI).
+  - **Azure Static Web Apps**: Hosting for `apps/console` (React/Vite).
+- **Identity**:
+  - **Microsoft Entra ID**: SSO and Role-Based Access Control (RBAC) for staff.
+- **Integration**:
+  - **Azure Service Bus**: Async event messaging (optional for future).
+  - **Key Vault**: Secret management.
+
+## Backend & Data Layer
+
+- **AmPac Brain (Python)**:
+
+  - **Framework**: FastAPI (Async API).
+  - **AI/ML**: LangChain, OpenAI GPT-4o, Microsoft Graph SDK.
+  - **Vector Store**: FAISS (Local) or Azure AI Search (Production).
+
+- **Mobile Backend (Firebase)**:
+  - **Auth**: Firebase Auth (Borrowers).
+  - **Database**: Firestore (NoSQL, Real-time sync).
+  - **Storage**: Firebase Storage (Document intake).
 
 ## State & Storage
 

@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Security
 from pydantic import BaseModel
 from app.services.website_service import website_service
+from app.core.auth import get_current_user_or_api_key
 
 router = APIRouter()
 
@@ -35,7 +36,10 @@ class SectionRegenerationRequest(BaseModel):
     allSections: dict
 
 @router.post("/generate", response_model=WebsiteGenerationResponse)
-async def generate_website(request: WebsiteGenerationRequest):
+async def generate_website(
+    request: WebsiteGenerationRequest,
+    user: dict = Security(get_current_user_or_api_key)
+):
     """
     Generates a landing page based on business details.
     """

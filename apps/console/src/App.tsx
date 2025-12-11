@@ -7,6 +7,8 @@ import ApplicationDetailPage from './pages/ApplicationDetailPage';
 import AdminPage from './pages/AdminPage';
 import VenturesDashboard from './pages/VenturesDashboard';
 import BrainPage from './pages/BrainPage';
+import PaymentsPage from './pages/PaymentsPage';
+import TeamsIntegrationPage from './pages/TeamsIntegrationPage';
 import DashboardLayout from './layouts/DashboardLayout';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { useNotifications } from './hooks/useNotifications';
@@ -17,17 +19,22 @@ function RequireAuth({ children }: { children: ReactNode }) {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    const bypass = localStorage.getItem('ampac_dev_bypass') === 'true';
-    setIsDevBypass(bypass);
+    // REMOVED: Dev bypass for security
+    // const bypass = localStorage.getItem('ampac_dev_bypass') === 'true';
+    // setIsDevBypass(bypass);
 
-    // If not authenticated and not bypass, try silent SSO if possible or just finish checking
-    // MSAL handles its own loading state usually, but we need to combine it with our bypass logic
+    // MSAL handles its own loading state usually
     setChecking(false);
   }, [isAuthenticated]);
 
   if (checking) return <div className="min-h-screen flex items-center justify-center bg-surfaceHighlight text-textSecondary">Loading...</div>;
 
-  if (!isAuthenticated && !isDevBypass) {
+  // REMOVED: Dev bypass for security
+  // if (!isAuthenticated && !isDevBypass) {
+  //   return <Navigate to="/login" replace />;
+  // }
+  
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
@@ -52,6 +59,8 @@ export default function App() {
           <Route path="search" element={<div className="p-8 text-textSecondary">Search Page (Coming Soon)</div>} />
           <Route path="ventures" element={<VenturesDashboard />} />
           <Route path="brain" element={<BrainPage />} />
+          <Route path="payments" element={<PaymentsPage />} />
+          <Route path="teams" element={<TeamsIntegrationPage />} />
           <Route path="admin" element={<AdminPage />} />
         </Route>
       </Routes>

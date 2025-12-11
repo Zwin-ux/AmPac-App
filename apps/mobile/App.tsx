@@ -21,6 +21,8 @@ import InviteFriendsScreen from './src/screens/InviteFriendsScreen';
 import BusinessProfileScreen from './src/screens/BusinessProfileScreen';
 import WebsiteBuilderScreen from './src/screens/WebsiteBuilderScreen';
 import AssistantScreen from './src/screens/AssistantScreen';
+import PaymentScreen from './src/screens/PaymentScreen';
+import FeedScreen from './src/screens/FeedScreen';
 
 // Types
 import { theme } from './src/theme';
@@ -134,6 +136,8 @@ function AppStack() {
           <Stack.Screen name="EditProfile" component={EditProfileScreen} />
           <Stack.Screen name="InviteFriends" component={InviteFriendsScreen} />
           <Stack.Screen name="WebsiteBuilder" component={WebsiteBuilderScreen} />
+          <Stack.Screen name="Payment" component={PaymentScreen} />
+          <Stack.Screen name="Feed" component={FeedScreen} />
           <Stack.Screen name="Network" component={NetworkScreen} />
         </>
       ) : (

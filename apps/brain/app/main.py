@@ -4,7 +4,7 @@ from app.core.config import get_settings
 import asyncio
 from app.services.sync_service import SyncService
 from fastapi.staticfiles import StaticFiles
-from app.api.routers import chat, website, documents, agents, knowledge, ventures, calendar, assistant
+from app.api.routers import chat, website, documents, agents, knowledge, ventures, calendar, assistant, stripe
 
 settings = get_settings()
 
@@ -55,9 +55,10 @@ app.include_router(ventures.router, prefix=f"{settings.API_V1_STR}/ventures", ta
 app.include_router(calendar.router, prefix=f"{settings.API_V1_STR}/calendar", tags=["calendar"])
 app.include_router(assistant.router, prefix=f"{settings.API_V1_STR}/assistant", tags=["assistant"])
 
-from app.api.routers import m365, applications
+from app.api.routers import m365, applications, stripe
 app.include_router(m365.router, prefix=f"{settings.API_V1_STR}/m365", tags=["m365"])
 app.include_router(applications.router, prefix=f"{settings.API_V1_STR}/applications", tags=["applications"])
+app.include_router(stripe.router, prefix=f"{settings.API_V1_STR}/stripe", tags=["stripe"])
 
 if __name__ == "__main__":
     import uvicorn

@@ -29,6 +29,15 @@ class Settings(BaseSettings):
     SHAREFILE_CLIENT_ID: Optional[str] = None
     SHAREFILE_CLIENT_SECRET: Optional[str] = None
     SHAREFILE_SUBDOMAIN: str = "ampac" # e.g., https://ampac.sharefile.com
+    
+    # Stripe API
+    STRIPE_SECRET_KEY: Optional[str] = None
+    STRIPE_WEBHOOK_SECRET: Optional[str] = None
+    
+    # API Security
+    BRAIN_API_KEY: Optional[str] = None
+    JWT_SECRET: str = "ampac-secret-key-change-in-production"
+    JWT_ALGORITHM: str = "HS256"
 
     class Config:
         env_file = ".env"

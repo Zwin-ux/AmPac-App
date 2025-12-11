@@ -1,4 +1,4 @@
-import { API_URL } from '../config';
+import { API_URL, BRAIN_API_KEY } from '../config';
 
 const BRAIN_API_URL = API_URL;
 
@@ -50,6 +50,7 @@ export const websiteService = {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-API-Key': BRAIN_API_KEY,
                 },
                 body: JSON.stringify(data),
             });
@@ -73,6 +74,7 @@ export const websiteService = {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-API-Key': BRAIN_API_KEY,
                 },
                 body: JSON.stringify(data),
             });
@@ -96,6 +98,7 @@ export const websiteService = {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-API-Key': BRAIN_API_KEY,
                 },
                 body: JSON.stringify(data),
             });
