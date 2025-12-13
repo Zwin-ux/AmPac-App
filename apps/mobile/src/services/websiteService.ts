@@ -10,6 +10,15 @@ export interface WebsiteGenerationRequest {
     phone?: string;
     email?: string;
     hasBusinessPlan?: boolean;
+    template?: string;
+    palette?: string;
+    font?: string;
+    contactCta?: string;
+    social?: {
+        instagram?: string;
+        facebook?: string;
+        linkedin?: string;
+    };
     ownerName?: string;
 }
 
@@ -23,11 +32,18 @@ export interface WebsitePublishRequest {
     ownerId: string;
     htmlContent: string;
     sections?: Record<string, any>;
+    template?: string;
+    palette?: string;
+    font?: string;
+    contactCta?: string;
+    social?: Record<string, any>;
+    slug?: string;
 }
 
 export interface WebsitePublishResponse {
     url: string;
     status: string;
+    slug?: string;
 }
 
 export interface SectionRegenerationRequest {
@@ -40,6 +56,20 @@ export interface SectionRegenerationRequest {
 export interface SectionRegenerationResponse {
     sectionData: any;
     html: string;
+}
+
+export interface UploadAssetRequest {
+    fileName: string;
+    contentType: string;
+    siteId?: string;
+    slug?: string;
+    type: 'logo' | 'hero' | 'gallery';
+}
+
+export interface UploadAssetResponse {
+    uploadUrl: string;
+    publicUrl: string;
+    path: string;
 }
 
 export const websiteService = {
@@ -111,6 +141,27 @@ export const websiteService = {
             return await response.json();
         } catch (error) {
             console.error('Website publishing error:', error);
+            throw error;
+        }
+    },
+
+    uploadAsset: async (data: UploadAssetRequest): Promise<UploadAssetResponse> => {
+        try {
+            const response = await fetch(`${BRAIN_API_URL}/website/upload`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-API-Key': BRAIN_API_KEY,
+                },
+                body: JSON.stringify(data),
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Upload URL failed: ${response.status} ${errorText}`);
+            }
+            return await response.json();
+        } catch (error) {
+            console.error('Website asset upload error:', error);
             throw error;
         }
     }

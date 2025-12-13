@@ -20,7 +20,6 @@ import EditProfileScreen from './src/screens/EditProfileScreen';
 import InviteFriendsScreen from './src/screens/InviteFriendsScreen';
 import BusinessProfileScreen from './src/screens/BusinessProfileScreen';
 import WebsiteBuilderScreen from './src/screens/WebsiteBuilderScreen';
-import AssistantScreen from './src/screens/AssistantScreen';
 import PaymentScreen from './src/screens/PaymentScreen';
 import FeedScreen from './src/screens/FeedScreen';
 
@@ -71,8 +70,6 @@ function MainTabs() {
               iconName = focused ? 'person' : 'person-outline';
             } else if (route.name === 'Support') {
               iconName = focused ? 'help-buoy' : 'help-buoy-outline';
-            } else if (route.name === 'Assistant') {
-              iconName = focused ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline';
             }
 
             return <Ionicons name={iconName} size={size} color={color} />;
@@ -83,12 +80,10 @@ function MainTabs() {
         <Tab.Screen name="Apply" component={ApplicationScreen} />
         <Tab.Screen name="Spaces" component={SpacesNavigator} />
         <Tab.Screen name="Network" component={NetworkScreen} />
-        <Tab.Screen name="Support" component={HotlineScreen} />
-        {/* Feature Flag: Borrower Concierge */}
         <Tab.Screen
-          name="Assistant"
-          component={AssistantScreen}
-          options={{ title: 'Concierge' }}
+          name="Support"
+          component={HotlineScreen}
+          options={{ title: 'Support' }}
         />
         <Tab.Screen name="Profile" component={ProfileScreen} />
       </Tab.Navigator>

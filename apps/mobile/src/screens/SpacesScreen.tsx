@@ -117,8 +117,15 @@ export default function SpacesScreen() {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
-                <Text style={styles.title}>Rent a Space</Text>
-                <Text style={styles.subtitle}>Find the perfect room for your meeting.</Text>
+                <View style={styles.headerRow}>
+                    <TouchableOpacity onPress={() => navigation.goBack?.()} style={styles.backButton}>
+                        <Ionicons name="arrow-back" size={22} color={theme.colors.text} />
+                    </TouchableOpacity>
+                    <View>
+                        <Text style={styles.title}>Rent a Space</Text>
+                        <Text style={styles.subtitle}>Find the perfect room for your meeting.</Text>
+                    </View>
+                </View>
                 <TouchableOpacity
                     style={[styles.multiToggle, selectionMode && styles.multiToggleActive]}
                     onPress={() => {
@@ -194,6 +201,18 @@ const styles = StyleSheet.create({
         paddingHorizontal: theme.spacing.lg,
         paddingTop: theme.spacing.md,
         paddingBottom: theme.spacing.md,
+    },
+    headerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: theme.spacing.md,
+    },
+    backButton: {
+        padding: 8,
+        borderRadius: theme.borderRadius.md,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        backgroundColor: theme.colors.surface,
     },
     title: {
         ...theme.typography.h1,

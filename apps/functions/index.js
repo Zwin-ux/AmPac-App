@@ -5,22 +5,36 @@ admin.initializeApp();
 
 exports.serveWebsite = functions.https.onRequest(async (req, res) => {
     const businessId = req.query.id;
+    const slug = req.query.slug;
 
-    if (!businessId) {
-        res.status(400).send("Missing business ID");
+    if (!businessId && !slug) {
+        res.status(400).send("Missing business ID or slug");
         return;
     }
 
     try {
-        const doc = await admin.firestore().collection("websites").doc(businessId).get();
+        let doc;
+        const websites = admin.firestore().collection("websites");
 
-        if (!doc.exists) {
+        if (businessId) {
+            doc = await websites.doc(businessId).get();
+        }
+
+        if ((!doc || !doc.exists) && slug) {
+            const snap = await websites.where("slug", "==", slug).limit(1).get();
+            if (!snap.empty) {
+                doc = snap.docs[0];
+            }
+        }
+
+        if (!doc || !doc.exists) {
             res.status(404).send("Website not found");
             return;
         }
 
         const data = doc.data();
-        const html = data.htmlContent || "<h1>No content</h1>";
+        const snapshot = data.publishedSnapshot || {};
+        const html = snapshot.htmlContent || data.htmlContent || "<h1>No content</h1>";
 
         res.set("Content-Type", "text/html");
         res.status(200).send(html);

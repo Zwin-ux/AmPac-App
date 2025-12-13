@@ -2,12 +2,16 @@ import os
 import json
 from datetime import datetime
 from app.services.llm_service import llm_service
-from app.core.firebase import get_db
+from app.core.firebase import get_db, get_bucket
+import re
+from app.core.config import get_settings
 
 class WebsiteService:
     def __init__(self):
         # In a real app, we might load these into memory or a vector DB
         self.template_dir = os.path.join(os.getcwd(), "data", "templates")
+        settings = get_settings()
+        self.api_base = os.getenv("CONTACT_API_BASE") or f"https://brain-service-952649324958.us-central1.run.app{settings.API_V1_STR}"
 
     def _read_template(self, filename: str) -> str:
         path = os.path.join(self.template_dir, filename)
@@ -17,7 +21,12 @@ class WebsiteService:
         except FileNotFoundError:
             return f"<!-- Template {filename} not found -->"
 
-    def _render_html(self, sections_data: dict, business_name: str = "My Business") -> str:
+    def _render_html(
+        self,
+        sections_data: dict,
+        business_name: str = "My Business",
+        theme: dict | None = None
+    ) -> str:
         """
         Assembles the HTML from templates and section data.
         """
@@ -40,7 +49,51 @@ class WebsiteService:
         full_body = f"{hero_html}\n{services_html}\n{contact_html}"
         final_html = layout_tpl.replace("{{ content }}", full_body)
         final_html = final_html.replace("{{ business_name }}", business_name)
-        
+        final_html = final_html.replace("{{ contact_api_base }}", self.api_base)
+
+        # Apply theme (palette, font)
+        palette = theme or {}
+        primary = palette.get("primary", "#0F172A")
+        accent = palette.get("accent", "#22C55E")
+        background = palette.get("background", "#F8FAFC")
+        surface = palette.get("surface", "#FFFFFF")
+        text = palette.get("text", "#0F172A")
+        font_family = palette.get("font", "Inter, sans-serif")
+        font_link = ""
+        if "Playfair Display" in font_family:
+            font_link = "<link href=\"https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&display=swap\" rel=\"stylesheet\">"
+        elif "Nunito" in font_family:
+            font_link = "<link href=\"https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap\" rel=\"stylesheet\">"
+
+        style_block = f"""
+        <style>
+            :root {{
+                --primary: {primary};
+                --accent: {accent};
+                --background: {background};
+                --surface: {surface};
+                --text: {text};
+                --font-family: {font_family};
+            }}
+            body {{
+                font-family: var(--font-family);
+                background: var(--background);
+                color: var(--text);
+            }}
+            a, .btn-primary {{
+                color: var(--primary);
+            }}
+            .btn-primary {{
+                background: var(--primary);
+                color: white;
+                padding: 12px 18px;
+                border-radius: 8px;
+                display: inline-block;
+            }}
+        </style>
+        """
+        head_injection = f"{font_link}{style_block}"
+        final_html = final_html.replace("</head>", f"{head_injection}</head>", 1)
         return final_html
 
     async def generate_website(self, business_data: dict) -> dict:
@@ -64,6 +117,19 @@ class WebsiteService:
             - Founder Story: Started in 2020 by {business_data.get('ownerName', 'the founder')} after 10 years in the industry.
             """
         
+        template_choice = business_data.get("template") or "local-hero"
+        palette_choice = business_data.get("palette") or "modern"
+        font_choice = business_data.get("font") or "sans"
+        contact_cta = business_data.get("contactCta") or "Call"
+        social = business_data.get("social") or {}
+
+        palette_map = {
+            "modern": {"primary": "#0F172A", "accent": "#22C55E", "background": "#F8FAFC", "surface": "#FFFFFF", "text": "#0F172A"},
+            "sunrise": {"primary": "#7C3AED", "accent": "#F97316", "background": "#FFF7ED", "surface": "#FFFFFF", "text": "#1F172A"},
+            "earth": {"primary": "#0B3C49", "accent": "#E3B448", "background": "#F5F1E9", "surface": "#FFFFFF", "text": "#0F172A"},
+        }
+        theme = palette_map.get(palette_choice, palette_map["modern"]) | {"font": "Inter, sans-serif" if font_choice == "sans" else ("'Playfair Display', serif" if font_choice == "serif" else "'Nunito', sans-serif")}
+
         hero_tpl = self._read_template("hero_modern.html")
         services_tpl = self._read_template("services_list.html")
         contact_tpl = self._read_template("contact_simple.html")
@@ -117,7 +183,9 @@ class WebsiteService:
                 "business_address": "...",
                 "business_zip": "...",
                 "business_phone": "...",
-                "business_email": "..."
+                "business_email": "...",
+                "contact_cta": "{contact_cta}",
+                "social_links": {json.dumps(social)}
             }}
         }}
         
@@ -162,11 +230,12 @@ class WebsiteService:
             }
 
         # 4. Assembly
-        final_html = self._render_html(sections_data, business_data.get('name', 'My Business'))
+        final_html = self._render_html(sections_data, business_data.get('name', 'My Business'), theme)
 
         return {
             "html": final_html,
-            "sections": sections_data
+            "sections": sections_data,
+            "theme": theme
         }
 
     async def regenerate_section(self, section_name: str, current_data: dict, instruction: str, all_sections: dict) -> dict:
@@ -218,7 +287,19 @@ class WebsiteService:
         except json.JSONDecodeError:
             raise ValueError("Failed to regenerate section")
 
-    async def publish_website(self, business_id: str, html_content: str, owner_id: str, sections: dict = None) -> dict:
+    async def publish_website(
+        self,
+        business_id: str,
+        html_content: str,
+        owner_id: str,
+        sections: dict = None,
+        template: str | None = None,
+        palette: str | None = None,
+        font: str | None = None,
+        contact_cta: str | None = None,
+        social: dict | None = None,
+        slug: str | None = None,
+    ) -> dict:
         """
         Saves the generated website to Firestore and returns the public URL.
         """
@@ -227,14 +308,38 @@ class WebsiteService:
         # Create or update the website document
         website_ref = db.collection("websites").document(business_id)
         
+        theme_meta = {
+            "template": template,
+            "palette": palette,
+            "font": font,
+            "contactCta": contact_cta,
+            "social": social,
+        }
+
+        # slug generation (cheap and stable)
+        def slugify(value: str) -> str:
+            value = value.lower()
+            value = re.sub(r"[^a-z0-9]+", "-", value).strip("-")
+            return value or "site"
+
+        site_slug = slug or slugify(business_id)
+
+        now = datetime.utcnow()
         website_data = {
             "id": business_id,
             "ownerId": owner_id,
             "htmlContent": html_content,
             "sections": sections, # Store structured data for future edits
-            "theme": "modern",
-            "updatedAt": datetime.utcnow(),
+            "theme": theme_meta,
+            "updatedAt": now,
             "isPublished": True,
+            "slug": site_slug,
+            "publishedSnapshot": {
+                "htmlContent": html_content,
+                "sections": sections,
+                "theme": theme_meta,
+                "publishedAt": now,
+            },
         }
         
         doc = website_ref.get()
@@ -246,10 +351,56 @@ class WebsiteService:
         
         project_id = "ampac-a325f" # Updated to correct project ID
         region = "us-central1"
-        public_url = f"https://{region}-{project_id}.cloudfunctions.net/serveWebsite?id={business_id}"
+        public_url = f"https://{region}-{project_id}.cloudfunctions.net/serveWebsite?id={business_id}&slug={site_slug}"
         
         website_ref.update({"publicUrl": public_url})
         
-        return {"url": public_url, "status": "published"}
+        return {"url": public_url, "status": "published", "slug": site_slug}
+
+    async def save_lead(self, site_id: str | None, slug: str | None, name: str, email: str, message: str) -> str:
+        db = get_db()
+        leads_ref = db.collection("website_leads")
+        now = datetime.utcnow()
+        doc_ref = leads_ref.document()
+        doc_ref.set({
+            "id": doc_ref.id,
+            "siteId": site_id,
+            "slug": slug,
+            "name": name,
+            "email": email,
+            "message": message,
+            "createdAt": now,
+        })
+        return doc_ref.id
+
+    async def generate_upload_url(self, site_id: str | None, slug: str | None, asset_type: str, file_name: str, content_type: str):
+        bucket = get_bucket()
+        db = get_db()
+        owner_or_site = site_id or slug or "unknown"
+        path = f"websites/{owner_or_site}/{asset_type}/{file_name}"
+        blob = bucket.blob(path)
+        upload_url = blob.generate_signed_url(
+            version="v4",
+            expiration=3600,
+            method="PUT",
+            content_type=content_type,
+        )
+        public_url = f"https://storage.googleapis.com/{bucket.name}/{path}"
+
+        # Store reference on site doc if available
+        if site_id:
+            website_ref = db.collection("websites").document(site_id)
+            update_data = {
+                "assets": {
+                    "logoUrl": public_url if asset_type == "logo" else None,
+                    "heroUrl": public_url if asset_type == "hero" else None,
+                    "gallery": [public_url] if asset_type == "gallery" else None,
+                },
+                "updatedAt": datetime.utcnow(),
+            }
+            # Merge behavior: only set relevant fields
+            website_ref.set(update_data, merge=True)
+
+        return {"uploadUrl": upload_url, "publicUrl": public_url, "path": path}
 
 website_service = WebsiteService()

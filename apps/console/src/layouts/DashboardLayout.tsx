@@ -36,6 +36,7 @@ export default function DashboardLayout() {
         { icon: Brain, label: 'Brain Console', path: '/brain' },
         { icon: CreditCard, label: 'Payments', path: '/payments' },
         { icon: MessageSquare, label: 'Teams', path: '/teams' },
+        { icon: Settings, label: 'Leads', path: '/leads' },
         { icon: Settings, label: 'Settings', path: '/settings' },
     ];
 

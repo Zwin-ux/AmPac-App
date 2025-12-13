@@ -9,6 +9,7 @@ import VenturesDashboard from './pages/VenturesDashboard';
 import BrainPage from './pages/BrainPage';
 import PaymentsPage from './pages/PaymentsPage';
 import TeamsIntegrationPage from './pages/TeamsIntegrationPage';
+import WebsiteLeadsPage from './pages/WebsiteLeadsPage';
 import DashboardLayout from './layouts/DashboardLayout';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { useNotifications } from './hooks/useNotifications';
@@ -61,6 +62,7 @@ export default function App() {
           <Route path="brain" element={<BrainPage />} />
           <Route path="payments" element={<PaymentsPage />} />
           <Route path="teams" element={<TeamsIntegrationPage />} />
+          <Route path="leads" element={<WebsiteLeadsPage />} />
           <Route path="admin" element={<AdminPage />} />
         </Route>
       </Routes>

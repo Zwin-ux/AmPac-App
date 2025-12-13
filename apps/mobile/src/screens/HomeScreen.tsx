@@ -59,6 +59,13 @@ export default function HomeScreen() {
     }, [user?.uid]);
 
     const userName = user?.fullName?.split(' ')[0] || 'Entrepreneur';
+    const tools = [
+        { label: 'Support & Concierge', icon: 'chatbox-ellipses', color: '#1565C0', background: '#E3F2FD', screen: 'Support' },
+        { label: 'Book Space', icon: 'calendar', color: '#2E7D32', background: '#E8F5E9', screen: 'Spaces' },
+        { label: 'Payments', icon: 'card', color: '#1565C0', background: '#E3F2FD', screen: 'Payment' },
+        { label: 'Web Builder', icon: 'globe-outline', color: '#EF6C00', background: '#FFF3E0', screen: 'WebsiteBuilder' },
+        { label: 'Network', icon: 'people', color: '#7B1FA2', background: '#F3E5F5', screen: 'Network' },
+    ];
 
     return (
         <SafeAreaView style={styles.container}>
@@ -111,66 +118,19 @@ export default function HomeScreen() {
 
                 <Text style={styles.sectionTitle}>Tools & Services</Text>
 
-                <View style={styles.quickActionsGrid}>
-                    <TouchableOpacity
-                        style={styles.actionCard}
-                        onPress={() => navigation.navigate('Support')}
-                    >
-                        <View style={[styles.iconContainer, { backgroundColor: '#E3F2FD' }]}>
-                            <Ionicons name="chatbox-ellipses" size={24} color="#1565C0" />
-                        </View>
-                        <Text style={styles.actionLabel}>Support</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.actionCard}
-                        onPress={() => navigation.navigate('Spaces')}
-                    >
-                        <View style={[styles.iconContainer, { backgroundColor: '#E8F5E9' }]}>
-                            <Ionicons name="calendar" size={24} color="#2E7D32" />
-                        </View>
-                        <Text style={styles.actionLabel}>Book Space</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.actionCard}
-                        onPress={() => navigation.navigate('WebsiteBuilder')}
-                    >
-                        <View style={[styles.iconContainer, { backgroundColor: '#FFF3E0' }]}>
-                            <Ionicons name="globe-outline" size={24} color="#EF6C00" />
-                        </View>
-                        <Text style={styles.actionLabel}>Web Builder</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.actionCard}
-                        onPress={() => navigation.navigate('Payment')}
-                    >
-                        <View style={[styles.iconContainer, { backgroundColor: '#E3F2FD' }]}>
-                            <Ionicons name="card" size={24} color="#1565C0" />
-                        </View>
-                        <Text style={styles.actionLabel}>Payments</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.actionCard}
-                        onPress={() => navigation.navigate('Feed')}
-                    >
-                        <View style={[styles.iconContainer, { backgroundColor: '#FEF3C7' }]}>
-                            <Ionicons name="newspaper" size={24} color="#D97706" />
-                        </View>
-                        <Text style={styles.actionLabel}>Feed</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.actionCard}
-                        onPress={() => navigation.navigate('Network')}
-                    >
-                        <View style={[styles.iconContainer, { backgroundColor: '#F3E5F5' }]}>
-                            <Ionicons name="people" size={24} color="#7B1FA2" />
-                        </View>
-                        <Text style={styles.actionLabel}>Network</Text>
-                    </TouchableOpacity>
+                <View style={styles.toolsGrid}>
+                    {tools.map((tool) => (
+                        <TouchableOpacity
+                            key={tool.label}
+                            style={styles.toolCard}
+                            onPress={() => navigation.navigate(tool.screen)}
+                        >
+                            <View style={[styles.toolIconContainer, { backgroundColor: tool.background }]}>
+                                <Ionicons name={tool.icon as any} size={22} color={tool.color} />
+                            </View>
+                            <Text style={styles.toolLabel}>{tool.label}</Text>
+                        </TouchableOpacity>
+                    ))}
                 </View>
 
                 {/* Spacer for SmartActionBar */}
@@ -267,114 +227,36 @@ const styles = StyleSheet.create({
         marginBottom: theme.spacing.md,
         marginTop: theme.spacing.lg,
     },
-    quickActionsGrid: {
+    toolsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'space-between',
-        gap: theme.spacing.md,
     },
-    actionCard: {
-        width: '48%', // Fixed width for 2 columns
-        aspectRatio: 1.2, // Keep boxy shape for grid items
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: theme.colors.surface,
+    toolCard: {
+        width: '31%', // 3 columns to reduce vertical scrolling
+        paddingVertical: theme.spacing.md,
+        paddingHorizontal: theme.spacing.sm,
         borderWidth: 1,
         borderColor: theme.colors.border,
-        borderRadius: theme.borderRadius.md,
-    },
-    fullWidthCard: {
-        width: '100%', // Full width
-        aspectRatio: undefined, // Let content define height
-        marginTop: theme.spacing.sm,
-        backgroundColor: theme.colors.surface,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-        borderRadius: theme.borderRadius.md,
-    },
-    actionIcon: {
-        marginBottom: theme.spacing.sm,
-    },
-    actionLabel: {
-        ...theme.typography.label as any,
-        textAlign: 'center',
-    },
-    dashboardCard: {
-        padding: theme.spacing.md,
-        marginBottom: theme.spacing.md,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-        borderRadius: theme.borderRadius.md,
-        backgroundColor: theme.colors.surface,
-    },
-    metricValue: {
-        ...theme.typography.h1 as any,
-        marginTop: theme.spacing.xs,
-    },
-    metricLabel: {
-        ...theme.typography.caption as any,
-    },
-    fullWidth: {
-        // Deprecated, use fullWidthCard
-    },
-    actionTouch: {
-        padding: theme.spacing.lg,
-        width: '100%',
-        height: '100%',
-        justifyContent: 'space-between',
-    },
-    iconContainer: {
-        width: 36,
-        height: 36,
-        borderRadius: theme.borderRadius.md,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: theme.spacing.md,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-        backgroundColor: theme.colors.surfaceHighlight,
-    },
-    actionTitle: {
-        ...theme.typography.h3 as any,
-        marginBottom: 4,
-    },
-    actionDescription: {
-        ...theme.typography.caption as any,
-    },
-    rowAction: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: theme.spacing.lg,
-    },
-    rowContent: {
-        flex: 1,
-        marginLeft: theme.spacing.md,
-    },
-    horizontalScroll: {
-        paddingHorizontal: theme.spacing.lg, // Align with header
-        paddingBottom: theme.spacing.md,
-        gap: theme.spacing.md,
-    },
-    horizontalCard: {
-        width: 110,
-        height: 110,
-        backgroundColor: theme.colors.surface,
         borderRadius: theme.borderRadius.lg,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-        marginRight: theme.spacing.md,
+        backgroundColor: theme.colors.surface,
+        marginBottom: theme.spacing.md,
+        alignItems: 'center',
         ...theme.shadows.subtle,
     },
-    horizontalTouch: {
-        flex: 1,
+    toolIconContainer: {
+        width: 36,
+        height: 36,
+        borderRadius: theme.borderRadius.round,
         justifyContent: 'center',
         alignItems: 'center',
-        padding: theme.spacing.md,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
     },
-    horizontalTitle: {
-        ...theme.typography.label as any,
-        marginTop: theme.spacing.sm,
+    toolLabel: {
+        ...theme.typography.caption as any,
         textAlign: 'center',
         color: theme.colors.text,
+        marginTop: theme.spacing.sm,
     },
 });

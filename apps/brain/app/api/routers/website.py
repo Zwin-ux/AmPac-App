@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Security
 from pydantic import BaseModel
 from app.services.website_service import website_service
 from app.core.auth import get_current_user_or_api_key
+from typing import Literal
 
 router = APIRouter()
 
@@ -14,20 +15,33 @@ class WebsiteGenerationRequest(BaseModel):
     email: str | None = None
     hasBusinessPlan: bool = False
     ownerName: str | None = None
+    template: str | None = None
+    palette: str | None = None
+    font: str | None = None
+    contactCta: str | None = None
+    social: dict | None = None
 
 class WebsiteGenerationResponse(BaseModel):
     html: str
     sections: dict
+    theme: dict | None = None
 
 class WebsitePublishRequest(BaseModel):
     businessId: str
     ownerId: str
     htmlContent: str
     sections: dict | None = None
+    template: str | None = None
+    palette: str | None = None
+    font: str | None = None
+    contactCta: str | None = None
+    social: dict | None = None
+    slug: str | None = None
 
 class WebsitePublishResponse(BaseModel):
     url: str
     status: str
+    slug: str | None = None
 
 class SectionRegenerationRequest(BaseModel):
     sectionName: str
@@ -61,9 +75,63 @@ async def publish_website(request: WebsitePublishRequest):
             business_id=request.businessId,
             html_content=request.htmlContent,
             owner_id=request.ownerId,
-            sections=request.sections
+            sections=request.sections,
+            template=request.template,
+            palette=request.palette,
+            font=request.font,
+            contact_cta=request.contactCta,
+            social=request.social,
+            slug=request.slug,
         )
         return WebsitePublishResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class ContactFormRequest(BaseModel):
+    siteId: str | None = None
+    slug: str | None = None
+    name: str
+    email: str
+    message: str
+
+@router.post("/contact")
+async def submit_contact(request: ContactFormRequest):
+    """
+    Saves a lead for a published site.
+    """
+    try:
+        saved = await website_service.save_lead(
+            site_id=request.siteId,
+            slug=request.slug,
+            name=request.name,
+            email=request.email,
+            message=request.message,
+        )
+        return {"status": "ok", "leadId": saved}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class UploadRequest(BaseModel):
+    siteId: str | None = None
+    slug: str | None = None
+    type: Literal['logo', 'hero', 'gallery']
+    fileName: str
+    contentType: str
+
+@router.post("/upload")
+async def upload_asset(request: UploadRequest, user: dict = Security(get_current_user_or_api_key)):
+    """
+    Returns a signed URL for uploading assets (logo/hero/gallery) to storage and stores the public URL on the site.
+    """
+    try:
+        result = await website_service.generate_upload_url(
+            site_id=request.siteId,
+            slug=request.slug,
+            asset_type=request.type,
+            file_name=request.fileName,
+            content_type=request.contentType,
+        )
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

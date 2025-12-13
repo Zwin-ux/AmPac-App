@@ -30,9 +30,30 @@ export default function RoomDetailScreen() {
             room,
             startTime: slotStart,
             endTime: slotEnd,
+            attendees,
         }),
-        [room, slotStart, slotEnd]
+        [room, slotStart, slotEnd, attendees]
     );
+
+    const pingTeams = async () => {
+        const url = "https://defaultcf0a93381f994a5ab494afb40f401d.da.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/b0837f8db0ab469abf2e8fcfff3cd97d/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=2qQJIDuLxK0fuiwyiZUAAx1Te7vPT2JZiaWvO2yb48k";
+        try {
+            await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    roomId: room.id,
+                    roomName: room.name,
+                    start: slotStart.toDate().toISOString(),
+                    end: slotEnd.toDate().toISOString(),
+                    attendees,
+                    price: pricing.priceBreakdown.total,
+                }),
+            });
+        } catch (err) {
+            console.warn('Teams webhook failed', err);
+        }
+    };
 
     // Mock booking logic for MVP
     const handleBookNow = async () => {
@@ -86,6 +107,8 @@ export default function RoomDetailScreen() {
             };
 
             await createBooking(booking);
+            // Fire-and-forget notification to Teams workflow
+            pingTeams();
 
             Alert.alert(
                 'Booking Confirmed',
@@ -102,6 +125,11 @@ export default function RoomDetailScreen() {
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView contentContainerStyle={styles.scrollContent}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                    <Ionicons name="arrow-back" size={22} color={theme.colors.text} />
+                    <Text style={styles.backButtonText}>Back</Text>
+                </TouchableOpacity>
+
                 <View style={styles.imagePlaceholder}>
                     <Text style={styles.placeholderText}>Room Photo</Text>
                 </View>
@@ -209,6 +237,18 @@ const styles = StyleSheet.create({
         backgroundColor: '#e0e0e0',
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    backButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: theme.spacing.lg,
+        paddingTop: theme.spacing.lg,
+        gap: 8,
+    },
+    backButtonText: {
+        color: theme.colors.text,
+        fontSize: 16,
+        fontWeight: '500',
     },
     placeholderText: {
         color: '#999',

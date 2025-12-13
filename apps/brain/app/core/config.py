@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: Optional[str] = None
     STRIPE_WEBHOOK_SECRET: Optional[str] = None
     
+    # Storage
+    STORAGE_BUCKET: Optional[str] = None
+    
     # API Security
     BRAIN_API_KEY: Optional[str] = None
     JWT_SECRET: str = "ampac-secret-key-change-in-production"

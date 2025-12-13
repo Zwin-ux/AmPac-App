@@ -4,23 +4,33 @@ import { Event } from '../types';
 let MOCK_EVENTS: Event[] = [
     {
         id: '1',
-        title: 'Small Business Mixer',
-        description: 'Join us for an evening of networking with local entrepreneurs.',
-        date: new Date(Date.now() + 86400000 * 2).toISOString(), // 2 days from now
-        location: 'AmPac Innovation Center',
+        title: 'AmPac Holiday Mixer',
+        description: 'Celebrate the season with fellow entrepreneurs! Food, drinks, and networking opportunities galore.',
+        date: new Date(Date.now() + 86400000 * 1).toISOString(), // Tomorrow
+        location: 'AmPac Innovation Center - Main Hall',
         organizerId: 'ampac_admin',
-        organizerName: 'AmPac Team',
-        attendees: ['user1', 'user2']
+        organizerName: 'Hilda Kennedy',
+        attendees: ['user1', 'user2', 'user4', 'user5']
     },
     {
         id: '2',
-        title: 'Grant Writing Workshop',
-        description: 'Learn how to write winning grant proposals for your non-profit.',
-        date: new Date(Date.now() + 86400000 * 5).toISOString(), // 5 days from now
-        location: 'Conference Room B',
+        title: 'SBA 504 Loan Webinar',
+        description: 'Everything you need to know about purchasing commercial real estate with 10% down.',
+        date: new Date(Date.now() + 86400000 * 3).toISOString(), // 3 days
+        location: 'Online (Zoom)',
         organizerId: 'expert_1',
-        organizerName: 'Sarah Jones',
-        attendees: ['user3']
+        organizerName: 'Ed Ryan',
+        attendees: ['user3', 'user6']
+    },
+    {
+        id: '3',
+        title: 'Women in Business Breakfast',
+        description: 'A morning of inspiration and connection for women business owners in the Inland Empire.',
+        date: new Date(Date.now() + 86400000 * 7).toISOString(), // 1 week
+        location: 'Riverside Convention Center',
+        organizerId: 'expert_2',
+        organizerName: 'Nicole J. Jones',
+        attendees: ['user7', 'user8', 'user9']
     }
 ];
 

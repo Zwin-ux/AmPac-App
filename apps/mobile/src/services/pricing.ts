@@ -70,7 +70,13 @@ const pickTierRate = (tiers: PricingRule['tiers'], durationHours: number, fallba
     return matched?.rate ?? tiers[tiers.length - 1].rate ?? fallbackRate;
 };
 
-const applyPricingRules = (room: Room, start: Timestamp, end: Timestamp, customerTier?: 'member' | 'non_member') => {
+const applyPricingRules = (
+    room: Room,
+    start: Timestamp,
+    end: Timestamp,
+    customerTier?: 'member' | 'non_member',
+    attendees: number = 1
+) => {
     const rules = defaultPricingRules(room).slice().sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
     const durationHours = hoursBetween(start, end);
     let hourlyRate = room.pricePerHour;
@@ -125,6 +131,13 @@ const applyPricingRules = (room: Room, start: Timestamp, end: Timestamp, custome
         }
     }
 
+    // Simple per-attendee adjustment: charge $5 per attendee per hour beyond the first
+    const attendeeSurcharge = Math.max(0, attendees - 1) * 5 * durationHours;
+    if (attendeeSurcharge > 0) {
+        baseCost += attendeeSurcharge;
+        appliedRules.push('attendee_surcharge');
+    }
+
     return { baseCost, appliedRules };
 };
 
@@ -154,13 +167,15 @@ export const pricingService = {
         startTime,
         endTime,
         customerTier,
+        attendees = 1,
     }: {
         room: Room;
         startTime: Timestamp;
         endTime: Timestamp;
         customerTier?: 'member' | 'non_member';
+        attendees?: number;
     }) => {
-        const { baseCost, appliedRules } = applyPricingRules(room, startTime, endTime, customerTier);
+        const { baseCost, appliedRules } = applyPricingRules(room, startTime, endTime, customerTier, attendees);
         const priceBreakdown = buildBreakdown(baseCost, appliedRules);
         return { priceBreakdown, appliedRules };
     },
@@ -182,6 +197,7 @@ export const pricingService = {
                 startTime,
                 endTime,
                 customerTier: request.customerTier,
+                attendees: roomItem.attendees ?? 1,
             });
             return { roomId, priceBreakdown, appliedRules };
         });
