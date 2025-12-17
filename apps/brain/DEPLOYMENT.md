@@ -39,6 +39,33 @@
    docker run -p 8000:8000 --env-file .env ampac-brain
    ```
 
+### Kubernetes (GKE)
+1. Build & push:
+   ```bash
+   docker build -t gcr.io/$PROJECT_ID/brain-service:$(git rev-parse --short HEAD) .
+   docker push gcr.io/$PROJECT_ID/brain-service:$(git rev-parse --short HEAD)
+   ```
+2. Update `k8s/brain-deployment.yaml` image tag to the pushed SHA (or use `kubectl set image ...`).
+3. Apply manifests:
+   ```bash
+   kubectl apply -f k8s/brain-deployment.yaml
+   kubectl apply -f k8s/brain-hpa.yaml
+   kubectl apply -f k8s/brain-pdb.yaml
+   kubectl apply -f k8s/ingress.yaml
+   ```
+4. Verify rollout & probes:
+   ```bash
+   kubectl rollout status deployment/brain-service
+   kubectl get pods -l app=brain-service
+   kubectl logs deploy/brain-service | tail
+   ```
+5. Health checks (via LB or port-forward):
+   - `/health` (readiness/liveness)
+   - `/api/v1/health` (aggregate)
+   - `/api/v1/health/deps`
+   - `/api/v1/health/sync`
+   - `/api/v1/health/calendar`
+
 ### Google Cloud Run (Serverless)
 1.  **Install Google Cloud SDK**:
     *   Download and install from: https://cloud.google.com/sdk/docs/install
@@ -136,11 +163,98 @@ This is the minimal, high-confidence path to take the stack live for consumers.
 - No PII in logs; mask tokens; redact request bodies in traces.
 - Enable daily Firestore backups; document restore steps.
 - Minimal IAM: separate deployer and runtime accounts; no broad Editor roles.
+- Feature flags & breakers are env-driven; do not leave mock flags enabled in production.
 
 ## 8) Runbook (what to do during/after deploy)
 - Deploy staging; run smoke: create app -> status sync -> task completion -> Ventures dashboard shows stats.
 - If green, deploy prod; monitor error rates/latency for first 30-60 minutes.
-- Rollback: redeploy previous image tag (Cloud Run revisions) or previous hosting release.
+- Rollback: redeploy previous image tag (Cloud Run revisions) or previous hosting release; for GKE use `kubectl rollout undo deployment/brain-service`.
+
+## Runtime Env Vars (flags/safety)
+- `GRAPH_ENABLED`, `VENTURES_ENABLED`, `SHAREFILE_ENABLED`, `BOOKINGS_ENABLED`: turn integrations on/off.
+- `GRAPH_MOCK`, `SHAREFILE_MOCK`, `VENTURES_MOCK_MODE`: mock behavior for demos; default false (except Ventures mock in non-prod).
+- `SYNC_EVENTS_ENABLED`, `CONSOLE_DASHBOARD_LIVE`: feature gates.
+- `BREAKER_FAILURE_THRESHOLD`, `BREAKER_RESET_SECONDS`: circuit breaker tuning.
+- `SKIP_SYNC_LOOP`: disable background sync in API pods (use a separate 1-replica worker deployment to run sync safely under HPA).
+- `TEAMS_WEBHOOK_URL`: incoming webhook URL for server-side support notifications (`POST /api/v1/support/notify`).
+
+## Ops: Dashboards, Alerts, and Runbooks (Brain + Borrower Freshness)
+
+- Dashboards (staging/prod):
+  - Overview: request rate/latency/error by endpoint; health checks; pod restarts.
+  - Sync: queue depth by status (pending/in_flight/dead_letter), oldest age, lag p50/95/99, DLQ count.
+  - Bookings: success/failure by reason, latency percentiles, breaker state, mock/flag state.
+  - Integrations: Ventures/Graph/ShareFile success rate and recent errors.
+  - Freshness: status/task update lag (source change → Firestore snapshot) and subscriber counts.
+
+- Alerts (page unless noted):
+  - Availability < 99% over 60m (health endpoints).
+  - Sync lag p95 > 90s for 10m or p99 > 240s.
+  - DLQ > 20 or oldest > 15m.
+  - Booking success < 98% over 15m; booking p95 > 5s.
+  - Breaker open > 5m (Graph/Ventures/ShareFile).
+  - Readiness failing > 5m; pod restarts > 3 in 15m (warn).
+
+- Runbooks (per alert):
+  - Sync lag/DLQ: check `/api/v1/health/sync`; if breaker open, consider mock; scale HPA; replay DLQ after fix.
+  - Ventures down: open breaker; optional mock; queue writes; console banner; resume and replay backlog.
+  - Graph down/booking failures: open breaker; return 503; retry once; verify app registration secrets; resume, re-run failed bookings.
+  - ShareFile down: store uploads temp; queue ShareFile push; keep tasks `awaiting_upload/pending_review`; resume then complete.
+  - Pods crashloop/readiness fail: inspect logs/env; rollback last deploy; ensure startup probe grace.
+
+- Canary/rollback drill:
+  - Canary 10% → 50% → 100% with gates: `/api/v1/health*` green; sync lag p95 < 60s; DLQ stable; booking success > 99%; no restart churn.
+  - Rollback: shift traffic to previous rev or `kubectl rollout undo deployment/brain-service`; verify health endpoints; replay DLQ if needed.
+  - Owners: Backend lead drives promotion; SRE/on-call approves; QA observes mobile/console smoke.
+
+## Reliability Quick Reference
+- SLOs: API availability 99.5%; sync freshness p95 < 60s / p99 < 180s; booking success > 99%; DLQ < 20 items and < 15m age; non-transient sync failures < 0.5%.
+- Health endpoints to monitor: `/health`, `/api/v1/health`, `/api/v1/health/deps`, `/api/v1/health/sync`, `/api/v1/health/calendar`.
+- Breakers/mocks: `GRAPH_MOCK`, `VENTURES_MOCK_MODE`, `SHAREFILE_MOCK`; breakers auto-open after failures and auto-half-open after `BREAKER_RESET_SECONDS`.
+
+## Feature Flags & Expected Defaults
+| Flag | Default (stg/prod) | Effect |
+| --- | --- | --- |
+| GRAPH_ENABLED | true | Enables Graph-backed bookings/availability. |
+| BOOKINGS_ENABLED | true | Allows `/api/v1/calendar/*`. |
+| GRAPH_MOCK | false | Bypass Graph; return mock slots/bookings. |
+| VENTURES_ENABLED | true | Use Ventures sync paths; if false, skip sync. |
+| VENTURES_MOCK_MODE | true (stg), false (prod) | Use mock Ventures client. |
+| SHAREFILE_ENABLED | true | Enable ShareFile pushes. |
+| SHAREFILE_MOCK | false | Bypass ShareFile writes. |
+| SYNC_EVENTS_ENABLED | true | Persist sync events for DLQ/metrics. |
+| CONSOLE_DASHBOARD_LIVE | false | Turn on live stats for console dashboard. |
+
+## Health Check Commands (staging/prod)
+```bash
+curl -s https://<host>/health
+curl -s https://<host>/api/v1/health
+curl -s https://<host>/api/v1/health/deps
+curl -s https://<host>/api/v1/health/sync
+curl -s https://<host>/api/v1/health/calendar
+```
+
+## Canary Playbook (GKE)
+1) Deploy new image tag to canary backend or use LB split to 10%.  
+2) Verify health endpoints green; watch logs for 10–30m.  
+3) Promote to 50%; re-check SLO gates: sync lag p95 < 60s, DLQ stable, booking success > 99%.  
+4) Promote to 100%.  
+5) Post-promo watch: error rate, restarts, booking latency for 30–60m.
+
+## Rollback Playbook (GKE)
+```bash
+kubectl rollout undo deployment/brain-service
+kubectl rollout status deployment/brain-service
+```
+Then re-check health endpoints and DLQ; keep breakers/mocks aligned to restore steady state.
+
+## Smoke Checklist (Staging)
+- `/api/v1/health` returns status ok/degraded with deps + breakers.  
+- Ventures dashboard loads (if enabled) with real or mock stats.  
+- Create app → status shows in console; task sync occurs.  
+- Upload completes and marks task pending_review/completed.  
+- Calendar slots load; booking succeeds and persists in Firestore; eventId returned.  
+- DLQ empty; sync lag within SLO.
 
 # Staging/Prod Setup & Secrets (Copy/Paste Friendly)
 

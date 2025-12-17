@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Mail, Calendar, ExternalLink } from "lucide-react";
+import { API_URL } from '../../config';
 // Assuming UI components might be in a different path or need to be mocked if they don't exist.
 // Based on file list, components/ui doesn't exist? Let's check.
 // Actually, I didn't verify if components/ui exists. I should check.
@@ -30,13 +31,13 @@ export const M365Widgets: React.FC = () => {
         const fetchData = async () => {
             try {
                 // 1. Check status
-                const statusRes = await fetch("http://localhost:8000/api/v1/m365/status");
+                const statusRes = await fetch(`${API_URL}/m365/status`);
                 const statusData = await statusRes.json();
                 setConnected(statusData.connected);
 
                 if (statusData.connected) {
                     // 2. Fetch Dashboard Data
-                    const dashboardRes = await fetch("http://localhost:8000/api/v1/m365/dashboard");
+                    const dashboardRes = await fetch(`${API_URL}/m365/dashboard`);
                     if (dashboardRes.ok) {
                         const data = await dashboardRes.json();
                         setEmails(data.emails || []);

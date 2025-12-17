@@ -1,4 +1,5 @@
 import { API_URL } from '../config';
+import { getFirebaseIdToken } from './brainAuth';
 
 export interface TimeSlot {
     startTime: string;
@@ -20,9 +21,13 @@ export interface BookingResponse {
 export const calendarService = {
     getAvailableSlots: async (staffEmail: string, durationMinutes: number, start?: string, end?: string): Promise<AvailabilityPayload> => {
         try {
+            const token = await getFirebaseIdToken();
             const response = await fetch(`${API_URL}/calendar/available`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
                 body: JSON.stringify({ staffEmail, durationMinutes, start, end })
             });
             if (!response.ok) throw new Error('Failed to fetch slots');
@@ -42,11 +47,15 @@ export const calendarService = {
         }
     },
 
-    bookMeeting: async (staffEmail: string, borrowerEmail: string, durationMinutes: number, chosenStartTime: string): Promise<BookingResponse> => {
+    bookMeeting: async (staffEmail: string, durationMinutes: number, chosenStartTime: string): Promise<BookingResponse> => {
+        const token = await getFirebaseIdToken();
         const response = await fetch(`${API_URL}/calendar/book`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ staffEmail, borrowerEmail, durationMinutes, chosenStartTime })
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ staffEmail, durationMinutes, chosenStartTime })
         });
         if (!response.ok) {
             const err = await response.json();

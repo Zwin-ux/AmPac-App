@@ -1,26 +1,69 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../../firebaseConfig';
 import { useNavigation } from '@react-navigation/native';
+import { auth } from '../../firebaseConfig';
 import { theme } from '../theme';
+import { ErrorBanner } from '../components/ui/ErrorBanner';
+import { ErrorMessage, getErrorMessage } from '../copy/errors';
 
 export default function SignInScreen() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<ErrorMessage | null>(null);
     const navigation = useNavigation<any>();
 
     const handleSignIn = async () => {
         if (!email || !password) {
-            Alert.alert('Error', 'Please enter both email and password');
+            setError(getErrorMessage('validation'));
             return;
         }
         setLoading(true);
+        setError(null);
         try {
-            await signInWithEmailAndPassword(auth, email, password);
-        } catch (error: any) {
-            Alert.alert('Sign In Error', error.message);
+            await signInWithEmailAndPassword(auth, email.trim(), password);
+        } catch (err: any) {
+            console.error('Sign In Error:', err);
+            if (err?.code === 'auth/network-request-failed') {
+                setError(getErrorMessage('networkUnavailable'));
+            } else if (err?.code === 'auth/invalid-credential' || err?.code === 'auth/invalid-email' || err?.code === 'auth/user-not-found') {
+                setError(getErrorMessage('signInFailed'));
+            } else {
+                setError(getErrorMessage('genericFallback'));
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDemo = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const { Timestamp } = await import('firebase/firestore');
+            const { userStore } = await import('../services/userStore');
+
+            const demoProfile = {
+                uid: 'demo-user-123',
+                role: 'entrepreneur',
+                fullName: 'Alex Rivera',
+                businessName: 'Rivera Innovations',
+                phone: '909-555-0101',
+                industry: 'Technology',
+                city: 'Riverside',
+                bio: 'Building the future of sustainable tech in the Inland Empire.',
+                jobTitle: 'Founder & CEO',
+                createdAt: Timestamp.now(),
+            };
+
+            userStore.setDemoUser(demoProfile as any);
+        } catch (err: any) {
+            console.error('Demo Error:', err);
+            setError({
+                ...getErrorMessage('genericFallback'),
+                detail: err?.message || getErrorMessage('genericFallback').detail,
+            });
         } finally {
             setLoading(false);
         }
@@ -38,6 +81,8 @@ export default function SignInScreen() {
                     resizeMode="contain"
                 />
                 <Text style={styles.subtitle}>Business Capital</Text>
+
+                {error ? <ErrorBanner {...error} /> : null}
 
                 <View style={styles.inputContainer}>
                     <Text style={styles.label}>Email</Text>
@@ -81,38 +126,10 @@ export default function SignInScreen() {
 
                 <TouchableOpacity
                     style={styles.demoButton}
-                    onPress={async () => {
-                        setLoading(true);
-                        try {
-                            // OFFLINE DEMO MODE
-                            const { Timestamp } = await import('firebase/firestore');
-                            const { userStore } = await import('../services/userStore');
-
-                            const demoProfile = {
-                                uid: 'demo-user-123',
-                                role: 'entrepreneur',
-                                fullName: 'Alex Rivera',
-                                businessName: 'Rivera Innovations',
-                                phone: '909-555-0101',
-                                industry: 'Technology',
-                                city: 'Riverside',
-                                bio: 'Building the future of sustainable tech in the Inland Empire.',
-                                jobTitle: 'Founder & CEO',
-                                createdAt: Timestamp.now(),
-                            };
-
-                            // Bypass Firebase Auth completely
-                            userStore.setDemoUser(demoProfile as any);
-
-                        } catch (error: any) {
-                            Alert.alert('Demo Error', error.message);
-                        } finally {
-                            setLoading(false);
-                        }
-                    }}
+                    onPress={handleDemo}
                     disabled={loading}
                 >
-                    <Text style={styles.demoButtonText}>⚡ Demo Mode (Bypass)</Text>
+                    <Text style={styles.demoButtonText}>Demo Mode (Bypass)</Text>
                 </TouchableOpacity>
             </View>
         </KeyboardAvoidingView>

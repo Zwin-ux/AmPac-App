@@ -3,7 +3,9 @@ import { View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, Keyboard
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../theme';
-import { userStore } from '../services/userStore';
+import { ErrorBanner } from '../components/ui/ErrorBanner';
+import { getErrorMessage, ErrorMessage } from '../copy/errors';
+import { getFirebaseIdToken } from '../services/brainAuth';
 
 type Message = {
     id: string;
@@ -19,7 +21,7 @@ export default function AssistantScreen() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputText, setInputText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useState<ErrorMessage | null>(null);
     const flatListRef = useRef<FlatList>(null);
 
     useEffect(() => {
@@ -50,25 +52,16 @@ export default function AssistantScreen() {
         setError(null);
 
         try {
-            const { getAuth } = await import('firebase/auth');
             const { API_URL } = await import('../config');
-
-            const auth = getAuth();
-            const token = await auth.currentUser?.getIdToken();
-
-            if (!token) {
-                // Fallback for dev/demo if no real auth
-                console.warn("No auth token found, using dev mode");
-            }
+            const token = await getFirebaseIdToken();
 
             console.log(`[Assistant] Sending request to: ${API_URL}/chat/completions`);
-            console.log(`[Assistant] Token: ${token ? 'Present' : 'Missing'}`);
 
             const response = await fetch(`${API_URL}/chat/completions`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token || 'dev-token'}`
+                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
                     messages: [
@@ -149,7 +142,7 @@ export default function AssistantScreen() {
 
         } catch (err) {
             console.error('[Assistant] Request Failed:', err);
-            setError("I'm having trouble connecting to the Brain. Please try again.");
+            setError(getErrorMessage('assistantUnavailable'));
         } finally {
             setIsLoading(false);
         }
@@ -194,11 +187,7 @@ export default function AssistantScreen() {
                     onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
                 />
 
-                {error && (
-                    <View style={styles.errorContainer}>
-                        <Text style={styles.errorText}>{error}</Text>
-                    </View>
-                )}
+                {error ? <ErrorBanner {...error} /> : null}
 
                 <View style={styles.inputContainer}>
                     <View style={styles.inputWrapper}>
@@ -323,15 +312,6 @@ const styles = StyleSheet.create({
     sendButtonDisabled: {
         backgroundColor: theme.colors.textSecondary,
         opacity: 0.5,
-    },
-    errorContainer: {
-        padding: theme.spacing.sm,
-        backgroundColor: '#FEF2F2',
-        alignItems: 'center',
-    },
-    errorText: {
-        color: theme.colors.error,
-        fontSize: 12,
     },
     disclaimer: {
         textAlign: 'center',

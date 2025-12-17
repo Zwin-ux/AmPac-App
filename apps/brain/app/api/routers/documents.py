@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, BackgroundTasks, Depends
 from pydantic import BaseModel
 from typing import Optional
 import uuid
 from app.services.document_analysis import document_analysis_agent
+from app.core.firebase_auth import AuthContext, get_current_user
 
 router = APIRouter()
 
@@ -12,7 +13,11 @@ class DocumentAnalysisRequest(BaseModel):
     content: Optional[str] = None
 
 @router.post("/analyze")
-async def analyze_document(request: DocumentAnalysisRequest, background_tasks: BackgroundTasks):
+async def analyze_document(
+    request: DocumentAnalysisRequest,
+    background_tasks: BackgroundTasks,
+    user: AuthContext = Depends(get_current_user),
+):
     """
     Triggers background analysis of a document.
     """
@@ -20,7 +25,11 @@ async def analyze_document(request: DocumentAnalysisRequest, background_tasks: B
     return {"status": "processing", "message": "Document analysis started"}
 
 @router.post("/upload")
-async def upload_document(file: UploadFile = File(...), background_tasks: BackgroundTasks = None):
+async def upload_document(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    user: AuthContext = Depends(get_current_user),
+):
     """
     Uploads a document and triggers analysis.
     For MVP, we generate a mock ID and trigger analysis immediately.

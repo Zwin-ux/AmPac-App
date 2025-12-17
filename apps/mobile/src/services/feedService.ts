@@ -1,127 +1,110 @@
-import { API_URL } from '../config';
-import { auth } from '../../firebaseConfig';
-
-export interface FeedItem {
-    id: string;
-    userId: string;
-    userName: string;
-    userAvatar?: string;
-    content: string;
-    type: 'post' | 'payment' | 'application' | 'website';
-    metadata?: any;
-    createdAt: Date;
-    likes: number;
-    comments: number;
-}
-
-// In-memory mock so unauthenticated/dev users can still see and post feed content
-let mockFeed: FeedItem[] = [
-    {
-        id: '1',
-        userId: 'user1',
-        userName: 'John Doe',
-        userAvatar: 'https://i.pravatar.cc/150?img=1',
-        content: 'Just created my business website using AmPac Web Builder! Check it out.',
-        type: 'website',
-        metadata: {
-            websiteUrl: 'https://sites.ampac.com/john-doe',
-            businessName: 'John\'s Coffee'
-        },
-        createdAt: new Date(Date.now() - 3600000),
-        likes: 12,
-        comments: 3
-    },
-    {
-        id: '2',
-        userId: 'user2',
-        userName: 'Jane Smith',
-        userAvatar: 'https://i.pravatar.cc/150?img=2',
-        content: 'My loan application has been approved! Thanks AmPac!',
-        type: 'application',
-        metadata: {
-            status: 'approved',
-            loanAmount: 50000
-        },
-        createdAt: new Date(Date.now() - 7200000),
-        likes: 25,
-        comments: 8
-    },
-    {
-        id: '3',
-        userId: 'user3',
-        userName: 'Mike Johnson',
-        userAvatar: 'https://i.pravatar.cc/150?img=3',
-        content: 'Just made a payment for my business services. Easy process!',
-        type: 'payment',
-        metadata: {
-            amount: 1000,
-            currency: 'USD'
-        },
-        createdAt: new Date(Date.now() - 10800000),
-        likes: 8,
-        comments: 2
-    },
-    {
-        id: '4',
-        userId: 'user4',
-        userName: 'Sarah Williams',
-        userAvatar: 'https://i.pravatar.cc/150?img=4',
-        content: 'Looking for advice on SBA loans. Any tips?',
-        type: 'post',
-        createdAt: new Date(Date.now() - 14400000),
-        likes: 5,
-        comments: 15
-    }
-];
+import {
+    collection,
+    query,
+    orderBy,
+    limit,
+    onSnapshot,
+    addDoc,
+    serverTimestamp,
+    updateDoc,
+    doc,
+    arrayUnion,
+    arrayRemove,
+    startAfter,
+    getDocs,
+    getDoc
+} from 'firebase/firestore';
+import { db, auth } from '../../firebaseConfig';
+import { FeedPost } from '../types';
 
 export const feedService = {
-    getFeed: async (): Promise<FeedItem[]> => {
-        try {
-            // If we have a logged-in user, we'd call the backend; for now mock data works for both
-            return mockFeed;
-        } catch (error) {
-            console.error('Feed service error:', error);
-            throw error;
-        }
+    /**
+     * Subscribe to the global/community feed.
+     */
+    subscribeToFeed: (limitCount: number = 20, onUpdate: (posts: FeedPost[]) => void) => {
+        const postsRef = collection(db, 'posts');
+        const q = query(postsRef, orderBy('createdAt', 'desc'), limit(limitCount));
+
+        return onSnapshot(q, (snapshot) => {
+            const posts = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            } as FeedPost));
+            onUpdate(posts);
+        }, (error) => {
+            console.error("Error subscribing to feed:", error);
+            onUpdate([]);
+        });
     },
 
-    createPost: async (content: string, type: FeedItem['type'] = 'post', metadata?: any): Promise<FeedItem> => {
+    createPost: async (content: string, type: FeedPost['type'] = 'announcement', mediaUrls: string[] = [], orgId?: string): Promise<string> => {
         try {
-            const user = auth.currentUser || { uid: 'dev-user', displayName: 'Demo User', photoURL: undefined };
+            const user = auth.currentUser;
+            if (!user) throw new Error("User not authenticated");
 
-            const newPost: FeedItem = {
-                id: Math.random().toString(36).substring(2, 9),
-                userId: user.uid,
-                userName: user.displayName || 'AmPac User',
-                userAvatar: user.photoURL || undefined,
+            const postsRef = collection(db, 'posts');
+            const newPost: Partial<FeedPost> = {
+                authorId: user.uid,
+                authorName: user.displayName || 'AmPac User',
+                authorAvatar: user.photoURL || undefined,
+                orgId,
                 content,
+                mediaUrls,
+                likes: [],
+                commentCount: 0,
                 type,
-                metadata,
-                createdAt: new Date(),
-                likes: 0,
-                comments: 0
+                createdAt: serverTimestamp() as any
             };
 
-            // Persist to in-memory mock so the UI immediately reflects the post
-            mockFeed = [newPost, ...mockFeed];
-            return newPost;
+            const docRef = await addDoc(postsRef, newPost);
+            return docRef.id;
         } catch (error) {
-            console.error('Error creating post:', error);
+            console.error("Error creating post:", error);
             throw error;
         }
     },
 
-    likePost: async (postId: string): Promise<void> => {
-        mockFeed = mockFeed.map(item =>
-            item.id === postId ? { ...item, likes: item.likes + 1 } : item
-        );
-        console.log('Liked post:', postId);
+    toggleLike: async (postId: string) => {
+        try {
+            const user = auth.currentUser;
+            if (!user) return; // Silent fail if not logged in
+
+            const postRef = doc(db, 'posts', postId);
+            // We don't read first to save a readOp, we can just try to use arrayUnion/Remove if we knew state.
+            // But to toggle, we need to know if we liked it.
+            // For UI responsiveness, UI usually passes current state. 
+            // Here we'll just check specific document cache or read it.
+            // Optimization: The UI calling this likely has the 'post' object.
+            // But services should be robust.
+            
+            // Let's implement a safe toggle using getDoc for now.
+            const snap = await getDoc(postRef);
+            if (!snap.exists()) return;
+            
+            const post = snap.data() as FeedPost;
+            const hasLiked = post.likes && post.likes.includes(user.uid);
+
+            if (hasLiked) {
+                await updateDoc(postRef, {
+                    likes: arrayRemove(user.uid)
+                });
+            } else {
+                await updateDoc(postRef, {
+                    likes: arrayUnion(user.uid)
+                });
+            }
+        } catch (error) {
+            console.error("Error toggling like:", error);
+            throw error;
+        }
     },
 
-    addComment: async (postId: string, comment: string): Promise<void> => {
-        mockFeed = mockFeed.map(item =>
-            item.id === postId ? { ...item, comments: item.comments + 1 } : item
-        );
-        console.log('Added comment to post:', postId, comment);
+    // Kept for backward compatibility if needed, but updated signatures
+    getFeed: async (): Promise<FeedPost[]> => {
+        // One-off fetch
+        const postsRef = collection(db, 'posts');
+        const q = query(postsRef, orderBy('createdAt', 'desc'), limit(20));
+        const snap = await getDocs(q);
+        return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FeedPost));
     }
 };

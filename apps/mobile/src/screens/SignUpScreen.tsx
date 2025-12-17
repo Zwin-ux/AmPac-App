@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { Timestamp } from 'firebase/firestore';
+import { useNavigation } from '@react-navigation/native';
 import { auth } from '../../firebaseConfig';
 import { createUserDoc } from '../services/firestore';
-import { serverTimestamp } from 'firebase/firestore';
+import { userStore } from '../services/userStore';
 import { theme } from '../theme';
-
-import { useNavigation } from '@react-navigation/native';
+import { User } from '../types';
+import { ErrorBanner } from '../components/ui/ErrorBanner';
+import { ErrorMessage, getErrorMessage } from '../copy/errors';
 
 export default function SignUpScreen() {
     const navigation = useNavigation<any>();
@@ -16,34 +19,90 @@ export default function SignUpScreen() {
     const [businessName, setBusinessName] = useState('');
     const [phone, setPhone] = useState('');
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<ErrorMessage | null>(null);
 
     const handleSignUp = async () => {
         if (!email || !password || !fullName || !businessName || !phone) {
-            Alert.alert('Error', 'Please fill in all fields');
+            setError(getErrorMessage('validation'));
             return;
         }
 
         setLoading(true);
+        setError(null);
         try {
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
             const user = userCredential.user;
 
-            await createUserDoc({
+            const newUser: User = {
                 uid: user.uid,
                 role: 'entrepreneur',
                 fullName,
                 businessName,
                 phone,
-                createdAt: serverTimestamp() as any,
-            });
+                createdAt: Timestamp.now(),
+                email: email.trim(),
+            };
 
-        } catch (error: any) {
-            console.error("SignUp Error:", error);
-            if (error.code === 'auth/configuration-not-found') {
-                Alert.alert('Configuration Error', 'Firebase Auth is not configured correctly. Please check your .env file and ensure EXPO_PUBLIC_FIREBASE_API_KEY is set.');
+            await createUserDoc(newUser);
+            await userStore.setUser(newUser);
+        } catch (err: any) {
+            console.error('SignUp Error:', err);
+            if (err?.code === 'auth/network-request-failed') {
+                setError(getErrorMessage('networkUnavailable'));
+            } else if (err?.code === 'auth/email-already-in-use') {
+                setError({
+                    ...getErrorMessage('signUpFailed'),
+                    detail: 'That email is already in use. Try another or sign in.',
+                });
+            } else if (err?.code === 'auth/weak-password') {
+                setError({
+                    ...getErrorMessage('signUpFailed'),
+                    detail: 'Password must be at least 6 characters.',
+                });
+            } else if (err?.code === 'auth/invalid-email') {
+                setError({
+                    ...getErrorMessage('validation'),
+                    detail: 'Please enter a valid email address.',
+                });
+            } else if (err?.code === 'auth/configuration-not-found') {
+                setError({
+                    ...getErrorMessage('serverHiccup'),
+                    detail: 'Auth configuration is missing. Check your environment keys.',
+                });
             } else {
-                Alert.alert('Sign Up Error', error.message);
+                setError(getErrorMessage('genericFallback'));
             }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDemo = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const { Timestamp } = await import('firebase/firestore');
+
+            const demoProfile = {
+                uid: 'demo-user-123',
+                role: 'entrepreneur',
+                fullName: 'Alex Rivera',
+                businessName: 'Rivera Innovations',
+                phone: '909-555-0101',
+                industry: 'Technology',
+                city: 'Riverside',
+                bio: 'Building the future of sustainable tech in the Inland Empire.',
+                jobTitle: 'Founder & CEO',
+                createdAt: Timestamp.now(),
+            };
+
+            userStore.setDemoUser(demoProfile as any);
+        } catch (err: any) {
+            console.error('Demo Error:', err);
+            setError({
+                ...getErrorMessage('genericFallback'),
+                detail: err?.message || getErrorMessage('genericFallback').detail,
+            });
         } finally {
             setLoading(false);
         }
@@ -63,6 +122,8 @@ export default function SignUpScreen() {
                     />
                     <Text style={styles.title}>Create Account</Text>
                     <Text style={styles.subtitle}>Join AmPac today</Text>
+
+                    {error ? <ErrorBanner {...error} /> : null}
 
                     <View style={styles.inputContainer}>
                         <Text style={styles.label}>Full Name</Text>
@@ -140,38 +201,10 @@ export default function SignUpScreen() {
 
                     <TouchableOpacity
                         style={styles.demoButton}
-                        onPress={async () => {
-                            setLoading(true);
-                            try {
-                                // OFFLINE DEMO MODE
-                                const { Timestamp } = await import('firebase/firestore');
-                                const { userStore } = await import('../services/userStore');
-
-                                const demoProfile = {
-                                    uid: 'demo-user-123',
-                                    role: 'entrepreneur',
-                                    fullName: 'Alex Rivera',
-                                    businessName: 'Rivera Innovations',
-                                    phone: '909-555-0101',
-                                    industry: 'Technology',
-                                    city: 'Riverside',
-                                    bio: 'Building the future of sustainable tech in the Inland Empire.',
-                                    jobTitle: 'Founder & CEO',
-                                    createdAt: Timestamp.now(),
-                                };
-
-                                // Bypass Firebase Auth completely
-                                userStore.setDemoUser(demoProfile as any);
-
-                            } catch (error: any) {
-                                Alert.alert('Demo Error', error.message);
-                            } finally {
-                                setLoading(false);
-                            }
-                        }}
+                        onPress={handleDemo}
                         disabled={loading}
                     >
-                        <Text style={styles.demoButtonText}>⚡ Demo Mode (Bypass)</Text>
+                        <Text style={styles.demoButtonText}>Demo Mode (Bypass)</Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>

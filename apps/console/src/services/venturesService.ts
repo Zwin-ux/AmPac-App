@@ -48,7 +48,17 @@ export const venturesService = {
             return await response.json();
         } catch (error) {
             console.error(error);
-            throw error;
+            // Provide a safe fallback shape so the UI can render
+            return {
+                syncedCount: 0,
+                pendingCount: 0,
+                errorCount: 0,
+                queueDepth: { pending: 0, in_flight: 0, dead_letter: 0 },
+                recentLogs: [],
+                stale: true,
+                lastLoopAt: null,
+                lastError: (error as Error)?.message || 'unknown'
+            };
         }
     },
 
@@ -76,5 +86,20 @@ export const venturesService = {
         } catch (e) {
             return { configured: false };
         }
+    },
+
+    getDlq: async () => {
+        const response = await fetch(`${API_URL}/dlq`);
+        if (!response.ok) throw new Error('Failed to fetch DLQ');
+        return await response.json();
+    },
+
+    replayEvent: async (eventId: string) => {
+        const response = await fetch(`${API_URL}/replay/${eventId}`, { method: 'POST' });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to replay event');
+        }
+        return await response.json();
     }
 };

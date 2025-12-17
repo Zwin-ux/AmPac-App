@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../theme';
 import { ApplicationType, QuickApplyData } from '../types';
 import { applicationStore } from '../services/applicationStore';
+import { getFirebaseIdToken } from '../services/brainAuth';
 
 interface QuickApplySheetProps {
     visible: boolean;
@@ -88,11 +89,13 @@ export default function QuickApplySheet({ visible, onClose, onSuccess, prefill }
 
             // Upload to backend
             const { API_URL } = await import('../config');
+            const token = await getFirebaseIdToken();
             const response = await fetch(`${API_URL}/documents/upload`, {
                 method: 'POST',
                 body: formData,
                 headers: {
                     'Content-Type': 'multipart/form-data',
+                    'Authorization': `Bearer ${token}`,
                 },
             });
 

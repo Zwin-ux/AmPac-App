@@ -11,16 +11,41 @@ service cloud.firestore {
       return request.auth.uid == userId;
     }
 
+    function hasUserDoc() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
     function getUserData() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
     function isStaff() {
-      return getUserData().role == 'ampac_staff';
+      return isAuthenticated() && hasUserDoc() && getUserData().role == 'ampac_staff';
     }
 
     function isAdmin() {
-      return getUserData().role == 'admin' || getUserData().staffRole == 'admin';
+      return isAuthenticated() && hasUserDoc() && (getUserData().role == 'admin' || getUserData().staffRole == 'admin');
+    }
+
+    function isApplicationOwnerData(appData) {
+      return isAuthenticated() && (
+        (appData.userId != null && appData.userId == request.auth.uid) ||
+        (appData.primaryBorrowerUserId != null && appData.primaryBorrowerUserId == request.auth.uid)
+      );
+    }
+
+    function applicationExists(appId) {
+      return exists(/databases/$(database)/documents/applications/$(appId));
+    }
+
+    function isApplicationOwner(appId) {
+      return isAuthenticated() &&
+        applicationExists(appId) &&
+        isApplicationOwnerData(get(/databases/$(database)/documents/applications/$(appId)).data);
+    }
+
+    function disallowClientFields(changedKeys, disallowed) {
+      return !changedKeys.hasAny(disallowed);
     }
 
     // --- USERS ---
@@ -29,17 +54,74 @@ service cloud.firestore {
       // Staff can read all user profiles
       allow read: if isAuthenticated() && (isOwner(userId) || isStaff());
       allow write: if isAuthenticated() && isOwner(userId);
+
+      // Blocked users subcollection (client-managed)
+      match /blocked/{blockedUserId} {
+        allow read, write: if isAuthenticated() && isOwner(userId);
+      }
     }
 
     // --- APPLICATIONS ---
     match /applications/{appId} {
-      // TEMPORARY: Allow public access for demo/dev purposes
-      allow read, write: if true;
+      allow read: if isAuthenticated() && (isStaff() || isApplicationOwnerData(resource.data));
+
+      // Client apps must never write Ventures-owned sync fields; Brain (Admin SDK) bypasses rules.
+      function hasDisallowedApplicationFieldsOnCreate() {
+        return request.resource.data.keys().hasAny([
+          'venturesLoanId',
+          'venturesStatus',
+          'lastSyncedAt'
+        ]);
+      }
+
+      function hasDisallowedApplicationFieldChanges() {
+        return !disallowClientFields(
+          request.resource.data.diff(resource.data).changedKeys(),
+          [
+            'venturesLoanId',
+            'venturesStatus',
+            'lastSyncedAt'
+          ]
+        );
+      }
+
+      // Borrower creates/updates only their own application.
+      allow create: if isAuthenticated() && (
+        // Staff can create for borrowers via internal tools
+        isStaff() ||
+        (
+          request.resource.data.userId == request.auth.uid &&
+          !hasDisallowedApplicationFieldsOnCreate()
+        )
+      );
+
+      allow update: if isAuthenticated() && (
+        (
+          isStaff() &&
+          // prevent staff clients from tampering with sync-owned fields
+          !hasDisallowedApplicationFieldChanges()
+        ) ||
+        (
+          isApplicationOwnerData(resource.data) &&
+          request.resource.data.userId == resource.data.userId &&
+          request.resource.data.userId == request.auth.uid &&
+          !hasDisallowedApplicationFieldChanges()
+        )
+      );
+
+      allow delete: if isAdmin();
     }
 
     // --- TASKS ---
     match /tasks/{taskId} {
-      allow read, write: if true;
+      allow read: if isAuthenticated() && (
+        isStaff() ||
+        (resource.data.loanApplicationId != null && isApplicationOwner(resource.data.loanApplicationId))
+      );
+
+      // Tasks are staff/Brain-managed; borrowers should not update task status directly.
+      allow create, update: if isStaff();
+      allow delete: if isAdmin();
     }
 
     // --- ROOMS ---
@@ -57,15 +139,118 @@ service cloud.firestore {
       
       // Users can create bookings
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+
+      // Users can update/cancel their own bookings; staff can update any
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isStaff());
       
       // No deletions allowed for audit trail
+      allow delete: if false;
+    }
+
+    // --- HOLDS (Spaces booking anti-collision) ---
+    // Note: holds contain no PII; readable for availability checks.
+    match /holds/{holdId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if false;
+    }
+
+    // --- SUPPORT / HOTLINE ---
+    match /hotlineRequests/{requestId} {
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isStaff());
+      allow update: if isStaff();
       allow delete: if false;
     }
     
     // --- BUSINESSES (Network) ---
     match /businesses/{businessId} {
         allow read: if true;
-        allow write: if isAuthenticated() && isStaff();
+        // Borrowers can write their own business profile doc; staff can write any.
+        allow create, update: if isAuthenticated() && (isStaff() || businessId == request.auth.uid);
+        allow delete: if isAdmin();
+    }
+
+    // --- CHAT & SOCIAL ---
+    match /organizations/{orgId}/channels/{channelId} {
+      // 1. Public channels: Any Auth user can read.
+      // 2. Private channels: Only members can read.
+      // 3. Create: Any Auth user can create (and becomes member).
+      allow read: if isAuthenticated() && (
+          resource.data.type == 'public' || 
+          request.auth.uid in resource.data.members
+      );
+      allow create: if isAuthenticated(); 
+      // Update: members only (e.g. adding members)
+      allow update: if isAuthenticated() && (
+          request.auth.uid in resource.data.members
+      );
+      
+      match /messages/{messageId} {
+         // Read: Must be able to read parent channel
+         allow read: if isAuthenticated() && (
+             get(/databases/$(database)/documents/organizations/$(orgId)/channels/$(channelId)).data.type == 'public' ||
+             request.auth.uid in get(/databases/$(database)/documents/organizations/$(orgId)/channels/$(channelId)).data.members
+         );
+         // Create: Must be member of channel (even public ones, ideally, but public implies membership is open)
+         // Simpler: If public, anyone can post. If private, only members.
+         allow create: if isAuthenticated() && (
+             get(/databases/$(database)/documents/organizations/$(orgId)/channels/$(channelId)).data.type == 'public' ||
+             request.auth.uid in get(/databases/$(database)/documents/organizations/$(orgId)/channels/$(channelId)).data.members
+         );
+         // Update: Only sender can edit/delete their own message
+         allow update, delete: if isAuthenticated() && resource.data.senderId == request.auth.uid;
+      }
+    }
+    
+    // --- REPORTS (For UGC Compliance) ---
+    match /reports/{reportId} {
+        allow create: if isAuthenticated();
+        allow read: if isStaff(); // Only staff/admin
+        allow update, delete: if isStaff();
+    }
+    
+    match /posts/{postId} {
+       allow read: if true;
+       allow create: if isAuthenticated() && request.resource.data.authorId == request.auth.uid;
+
+       // Allow likes by any authenticated user, but only allow author to change other fields.
+       allow update: if isAuthenticated() && (
+         resource.data.authorId == request.auth.uid ||
+         request.resource.data.diff(resource.data).changedKeys().hasOnly(['likes'])
+       );
+
+       allow delete: if isAuthenticated() && (resource.data.authorId == request.auth.uid || isStaff());
+    }
+
+    // --- DOCUMENT REQUESTS & UPLOADED DOCUMENTS ---
+    match /document_requests/{requestId} {
+      allow read: if isAuthenticated() && (
+        isStaff() ||
+        (resource.data.loanApplicationId != null && isApplicationOwner(resource.data.loanApplicationId))
+      );
+      allow create, update: if isStaff();
+      allow delete: if isAdmin();
+    }
+
+    match /documents/{documentId} {
+      allow read: if isAuthenticated() && (
+        isStaff() ||
+        (resource.data.loanApplicationId != null && isApplicationOwner(resource.data.loanApplicationId))
+      );
+      // Borrowers can create document records for their own application uploads.
+      allow create: if isAuthenticated() &&
+        request.resource.data.uploadedBy == request.auth.uid &&
+        request.resource.data.loanApplicationId != null &&
+        isApplicationOwner(request.resource.data.loanApplicationId);
+      allow update: if isStaff();
+      allow delete: if isAdmin();
+    }
+
+    // --- PAYMENTS (Console only) ---
+    match /payments/{paymentId} {
+      allow read, write: if isStaff();
+      allow delete: if isAdmin();
     }
   }
 }

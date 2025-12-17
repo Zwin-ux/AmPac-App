@@ -6,6 +6,9 @@ from app.services.ventures_client import VenturesClient, ventures_client
 from app.services.encryption_service import encryption_service
 from app.services.sync_service import sync_service_instance
 from app.core.config import get_settings
+from app.services.sync_event_store import get_queue_depths, get_recent_events, get_dead_letter, update_event_status
+from app.services.sync_health_store import read_sync_heartbeat
+from datetime import datetime, timedelta
 
 router = APIRouter()
 
@@ -130,24 +133,59 @@ async def get_dashboard_stats():
     """
     settings = get_settings()
     
-    # Feature flag or fallback if service not initialized
-    if settings.USE_FAKE_SYNC or not sync_service_instance:
-        return {
-            "syncedCount": 142,
-            "pendingCount": 12,
-            "errorCount": 5,
-            "recentLogs": [
-                {"timestamp": "2023-10-27T10:00:00Z", "status": "success", "message": "Synced Loan 123 (Fake)"},
-                {"timestamp": "2023-10-27T09:55:00Z", "status": "error", "message": "Failed to connect (Fake)"}
-            ]
+    queue_depth = get_queue_depths()
+    logs = get_recent_events(limit=20)
+
+    heartbeat = None
+    if sync_service_instance:
+        heartbeat = sync_service_instance.get_health_snapshot()
+    else:
+        hb = read_sync_heartbeat() or {}
+        heartbeat = {
+            "lastLoopAt": hb.get("lastLoopAt").isoformat() if hasattr(hb.get("lastLoopAt"), "isoformat") else hb.get("lastLoopAt"),
+            "lastError": hb.get("lastError"),
+            "stats": hb.get("stats") or {},
         }
-    
-    stats = sync_service_instance.get_sync_stats()
-    logs = sync_service_instance.get_recent_logs()
-    
+
+    last_loop_at = heartbeat.get("lastLoopAt")
+    stale = True
+    if last_loop_at:
+        try:
+            last_dt = datetime.fromisoformat(str(last_loop_at))
+            stale = datetime.utcnow() - last_dt > timedelta(seconds=settings.SYNC_HEALTH_STALE_SECONDS)
+        except Exception:
+            stale = True
+
+    stats = heartbeat.get("stats") or {}
+    synced_count = stats.get("syncedCount", 0)
+    error_count = stats.get("errorCount", 0)
+
     return {
-        "syncedCount": stats["syncedCount"],
-        "pendingCount": stats["pendingCount"],
-        "errorCount": stats["errorCount"],
-        "recentLogs": logs
+        "syncedCount": synced_count,
+        "pendingCount": queue_depth.get("pending", 0),
+        "errorCount": max(error_count, queue_depth.get("dead_letter", 0)),
+        "queueDepth": queue_depth,
+        "recentLogs": logs,
+        "stale": stale,
+        "lastLoopAt": last_loop_at,
+        "lastError": heartbeat.get("lastError"),
     }
+
+
+@router.get("/dlq")
+async def list_dead_letter():
+    """
+    Returns dead-lettered sync events for replay/triage.
+    """
+    return {"items": get_dead_letter(limit=50)}
+
+
+@router.post("/replay/{event_id}")
+async def replay_event(event_id: str):
+    """
+    Marks a dead-lettered event as pending for reprocessing.
+    """
+    success = update_event_status(event_id, "pending", last_error=None)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to requeue event")
+    return {"success": True, "eventId": event_id, "status": "pending"}

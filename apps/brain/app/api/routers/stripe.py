@@ -1,12 +1,10 @@
-from fastapi import APIRouter, HTTPException, Request, Security
+from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 from app.services.stripe_service import stripe_service
 from app.core.config import get_settings
-from app.core.auth import get_current_user_or_api_key, require_admin
-import hmac
-import hashlib
-import json
+from app.core.firebase_auth import AuthContext, get_current_user
+import stripe
 
 router = APIRouter()
 
@@ -37,7 +35,7 @@ class CreateCheckoutSessionRequest(BaseModel):
 @router.post("/customers", response_model=Dict[str, Any])
 async def create_customer(
     request: CreateCustomerRequest,
-    user: dict = Security(get_current_user_or_api_key)
+    user: AuthContext = Depends(get_current_user)
 ):
     """
     Creates a new Stripe customer.
@@ -53,7 +51,7 @@ async def create_customer(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/payment-intents", response_model=Dict[str, Any])
-async def create_payment_intent(request: CreatePaymentIntentRequest):
+async def create_payment_intent(request: CreatePaymentIntentRequest, user: AuthContext = Depends(get_current_user)):
     """
     Creates a payment intent for a customer.
     """
@@ -74,7 +72,7 @@ async def create_payment_intent(request: CreatePaymentIntentRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/subscriptions", response_model=Dict[str, Any])
-async def create_subscription(request: CreateSubscriptionRequest):
+async def create_subscription(request: CreateSubscriptionRequest, user: AuthContext = Depends(get_current_user)):
     """
     Creates a subscription for a customer.
     """
@@ -89,7 +87,7 @@ async def create_subscription(request: CreateSubscriptionRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/checkout-sessions", response_model=Dict[str, Any])
-async def create_checkout_session(request: CreateCheckoutSessionRequest):
+async def create_checkout_session(request: CreateCheckoutSessionRequest, user: AuthContext = Depends(get_current_user)):
     """
     Creates a Stripe checkout session.
     """
@@ -105,7 +103,7 @@ async def create_checkout_session(request: CreateCheckoutSessionRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/payment-intents/{customer_id}", response_model=List[Dict[str, Any]])
-async def list_payment_intents(customer_id: str):
+async def list_payment_intents(customer_id: str, user: AuthContext = Depends(get_current_user)):
     """
     Lists payment intents for a customer.
     """

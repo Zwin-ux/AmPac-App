@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { CreditCard, DollarSign, Users, Search, Plus, MoreVertical } from 'lucide-react';
-import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, Timestamp } from 'firebase/firestore';
+import { Users, Search, Plus, MoreVertical } from 'lucide-react';
+import { collection, onSnapshot, doc, updateDoc, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 
 // Mock data for development - replace with real Stripe data later

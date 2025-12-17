@@ -1,38 +1,45 @@
 import { useState, useEffect } from 'react';
-import { Activity, AlertTriangle, CheckCircle, Clock, RefreshCw, Search, Link } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle, Clock, RefreshCw, Search, Link, AlertCircle } from 'lucide-react';
 import { venturesService } from '../services/venturesService';
 import VenturesConnectionModal from '../components/ventures/VenturesConnectionModal';
 import { ConnectM365Button } from '../components/ConnectM365Button';
 import { M365Widgets } from '../components/dashboard/DashboardWidgets';
-import type { VenturesSyncLog } from '../types';
+import type { VenturesDashboardStats, VenturesDashboardLog } from '../types';
 
 export default function VenturesDashboard() {
-    const [stats, setStats] = useState<any>(null);
+    const [stats, setStats] = useState<VenturesDashboardStats | null>(null);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState<'all' | 'error' | 'pending'>('all');
+    const [filter, setFilter] = useState<'all' | 'error' | 'pending' | 'dlq'>('all');
     const [isConnected, setIsConnected] = useState(false);
     const [config, setConfig] = useState<{ username?: string, site_name?: string }>({});
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     const loadData = async () => {
         try {
-            const [statsData, configData] = await Promise.all([
-                venturesService.getDashboardStats(),
-                venturesService.getConfigStatus()
-            ]);
-            setStats(statsData);
-            setIsConnected(configData.configured);
-            setConfig(configData);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    };
+        const [statsData, configData] = await Promise.all([
+            venturesService.getDashboardStats(),
+            venturesService.getConfigStatus()
+        ]);
+        setStats(statsData);
+        setIsConnected(configData.configured);
+        setConfig(configData);
+    } catch (err) {
+        console.error(err);
+    } finally {
+        setLoading(false);
+    }
+};
 
     useEffect(() => {
         loadData();
     }, []);
+
+    const filteredLogs = (stats?.recentLogs || []).filter((log) => {
+        if (filter === 'error') return log.status === 'error' || log.status === 'dead_letter';
+        if (filter === 'pending') return log.status === 'pending';
+        if (filter === 'dlq') return log.status === 'dead_letter';
+        return true;
+    });
 
     if (loading) return <div className="p-8 text-center">Loading Dashboard...</div>;
 
@@ -89,8 +96,8 @@ export default function VenturesDashboard() {
                             <CheckCircle className="w-5 h-5 text-success" />
                         </div>
                     </div>
-                    <div className="text-3xl font-bold text-text">{stats.synced}</div>
-                    <div className="text-sm text-success mt-1">+12 today</div>
+                    <div className="text-3xl font-bold text-text">{stats?.syncedCount ?? 0}</div>
+                    <div className="text-sm text-success mt-1">Live from Brain</div>
                 </div>
 
                 <div className="bg-surface p-6 rounded-lg border border-border shadow-sm">
@@ -100,8 +107,10 @@ export default function VenturesDashboard() {
                             <Clock className="w-5 h-5 text-blue-600" />
                         </div>
                     </div>
-                    <div className="text-3xl font-bold text-text">{stats.pending}</div>
-                    <div className="text-sm text-textSecondary mt-1">Awaiting review</div>
+                    <div className="text-3xl font-bold text-text">{stats?.pendingCount ?? 0}</div>
+                    <div className="text-sm text-textSecondary mt-1">
+                        Queue: {stats?.queueDepth?.pending ?? 0} pending / {stats?.queueDepth?.in_flight ?? 0} in-flight
+                    </div>
                 </div>
 
                 <div className="bg-surface p-6 rounded-lg border border-border shadow-sm">
@@ -111,10 +120,19 @@ export default function VenturesDashboard() {
                             <AlertTriangle className="w-5 h-5 text-error" />
                         </div>
                     </div>
-                    <div className="text-3xl font-bold text-text">{stats.errors}</div>
-                    <div className="text-sm text-error mt-1">Requires attention</div>
+                    <div className="text-3xl font-bold text-text">{stats?.errorCount ?? 0}</div>
+                    <div className="text-sm text-error mt-1">
+                        DLQ: {stats?.queueDepth?.dead_letter ?? 0}
+                    </div>
                 </div>
             </div>
+
+            {stats?.stale && (
+                <div className="mb-6 px-4 py-3 rounded-md border border-yellow-300 bg-yellow-50 text-yellow-800 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    Sync loop is stale; check Brain health.
+                </div>
+            )}
 
             {/* Operational View */}
             <div className="bg-surface rounded-lg border border-border shadow-sm">
@@ -141,6 +159,7 @@ export default function VenturesDashboard() {
                             <option value="all">All Events</option>
                             <option value="error">Errors Only</option>
                             <option value="pending">Pending</option>
+                            <option value="dlq">Dead Letter</option>
                         </select>
                     </div>
                 </div>
@@ -158,37 +177,59 @@ export default function VenturesDashboard() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
-                            {stats.recentLogs.map((log: VenturesSyncLog) => (
-                                <tr key={log.id} className="hover:bg-gray-50">
+                            {filteredLogs.map((log: VenturesDashboardLog, idx: number) => (
+                                <tr key={log.id || idx} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 text-textSecondary">
-                                        {new Date(log.timestamp).toLocaleString()}
+                                        {log.timestamp
+                                            ? new Date(log.timestamp).toLocaleString()
+                                            : log.updatedAt
+                                                ? new Date(log.updatedAt).toLocaleString()
+                                                : '—'}
                                     </td>
                                     <td className="px-6 py-4 font-medium text-primary">
-                                        {log.loanApplicationId}
+                                        {log.loanApplicationId || '—'}
                                     </td>
                                     <td className="px-6 py-4 capitalize">
                                         <span className="px-2 py-1 rounded bg-gray-100 text-xs font-medium">
-                                            {log.mode?.replace('_', ' ') || 'Unknown'}
+                                            {log.type?.replace('_', ' ') || 'Unknown'}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4">
                                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${log.status === 'success' ? 'bg-green-100 text-green-800' :
-                                            log.status === 'validation_error' ? 'bg-yellow-100 text-yellow-800' :
-                                                'bg-red-100 text-red-800'
+                                            log.status === 'pending' ? 'bg-blue-100 text-blue-800' :
+                                                log.status === 'info' ? 'bg-gray-100 text-gray-700' :
+                                                    log.status === 'dead_letter' ? 'bg-red-200 text-red-900' :
+                                                        'bg-red-100 text-red-800'
                                             }`}>
                                             {log.status === 'success' && <CheckCircle className="w-3 h-3" />}
-                                            {log.status === 'validation_error' && <AlertTriangle className="w-3 h-3" />}
-                                            {log.status === 'failed' && <AlertTriangle className="w-3 h-3" />}
+                                            {log.status !== 'success' && <AlertTriangle className="w-3 h-3" />}
                                             {log.status?.replace('_', ' ') || 'Unknown'}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-textSecondary max-w-xs truncate">
-                                        {log.summary}
+                                        {log.message}
                                     </td>
                                     <td className="px-6 py-4">
-                                        <button className="text-primary hover:text-primaryLight font-medium text-xs">
-                                            View Details
-                                        </button>
+                                        {log.status === 'dead_letter' && log.id ? (
+                                            <button
+                                                className="text-primary hover:text-primaryLight font-medium text-xs"
+                                                onClick={async () => {
+                                                    try {
+                                                        await venturesService.replayEvent(log.id!);
+                                                        loadData();
+                                                    } catch (err) {
+                                                        console.error(err);
+                                                        alert('Replay failed');
+                                                    }
+                                                }}
+                                            >
+                                                Replay
+                                            </button>
+                                        ) : (
+                                            <button className="text-primary hover:text-primaryLight font-medium text-xs">
+                                                View Details
+                                            </button>
+                                        )}
                                     </td>
                                 </tr>
                             ))}

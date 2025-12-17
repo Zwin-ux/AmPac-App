@@ -77,6 +77,11 @@ export interface User {
     city?: string;
     email?: string;
     notificationsEnabled?: boolean;
+    
+    // Business Card Customization
+    cardColor?: string;
+    businessStatus?: 'idea' | 'startup' | 'scaling' | 'established' | 'enterprise';
+    businessType?: 'technology' | 'retail' | 'service' | 'manufacturing' | 'health' | 'finance' | 'other';
 }
 
 export interface LoanProduct {
@@ -354,4 +359,55 @@ export interface Event {
     organizerId: string;
     organizerName: string;
     attendees: string[]; // User IDs
+}
+
+// --- Chat & Social ---
+
+export interface Channel {
+    id: string;
+    orgId: string;
+    type: 'public' | 'private' | 'dm';
+    name: string;
+    description?: string;
+    members: string[]; // User UIDs
+    lastMessage?: {
+        text: string;
+        senderId: string;
+        createdAt: Timestamp;
+    };
+    createdAt: Timestamp;
+    createdBy: string;
+}
+
+export interface Message {
+    id: string;
+    channelId: string;
+    text: string;
+    senderId: string;
+    senderName: string;
+    senderAvatar?: string;
+    type: 'text' | 'image' | 'system';
+    mediaUrl?: string;
+    reactions?: Record<string, string[]>; // { "👍": ["uid1", "uid2"] }
+    replyCount?: number;
+    createdAt: Timestamp;
+    updatedAt?: Timestamp;
+}
+
+export interface FeedPost {
+    id: string;
+    authorId: string;
+    authorName: string;
+    authorAvatar?: string;
+    orgId?: string;
+
+    content: string;
+    mediaUrls?: string[];
+
+    likes: string[]; // Array of UIDs
+    commentCount: number;
+
+    type: 'announcement' | 'showcase' | 'qa';
+
+    createdAt: Timestamp;
 }

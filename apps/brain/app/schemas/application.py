@@ -46,7 +46,7 @@ class ApplicationBase(BaseModel):
 
 class ApplicationCreate(ApplicationBase):
     type: LoanProductCode
-    userId: str
+    # userId is derived from Firebase auth; do not accept from client
 
 class ApplicationUpdate(ApplicationBase):
     currentStep: Optional[int] = None

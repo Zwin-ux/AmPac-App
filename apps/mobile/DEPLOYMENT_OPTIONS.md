@@ -4,6 +4,8 @@ Currently, you are running a **Development Server** (`npx expo start`). This req
 
 Since your backend (Firebase) is already cloud-hosted and running 24/7, you just need to publish the "Frontend" (the app itself).
 
+If you’re deploying to real users via the App Store / Google Play, use `apps/mobile/DEPLOYMENT.md` (full production runbook).
+
 ## Option 1: Publish as a Website (Fastest)
 You can deploy the web version of your app to a hosting provider. This gives you a URL (e.g., `https://ampac-mobile.vercel.app`) that anyone can access 24/7.
 

@@ -16,7 +16,6 @@ import { useNotifications } from './hooks/useNotifications';
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const isAuthenticated = useIsAuthenticated();
-  const [isDevBypass, setIsDevBypass] = useState(false);
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {

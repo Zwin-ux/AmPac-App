@@ -1,4 +1,5 @@
-import { API_URL, BRAIN_API_KEY } from '../config';
+import { API_URL } from '../config';
+import { getFirebaseIdToken } from './brainAuth';
 
 const BRAIN_API_URL = API_URL;
 
@@ -76,11 +77,12 @@ export const websiteService = {
     generateWebsite: async (data: WebsiteGenerationRequest): Promise<WebsiteGenerationResponse> => {
         try {
             console.log('Generating website with data:', data);
+            const token = await getFirebaseIdToken();
             const response = await fetch(`${BRAIN_API_URL}/website/generate`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-API-Key': BRAIN_API_KEY,
+                    'Authorization': `Bearer ${token}`,
                 },
                 body: JSON.stringify(data),
             });
@@ -100,11 +102,12 @@ export const websiteService = {
     regenerateSection: async (data: SectionRegenerationRequest): Promise<SectionRegenerationResponse> => {
         try {
             console.log('Regenerating section:', data.sectionName);
+            const token = await getFirebaseIdToken();
             const response = await fetch(`${BRAIN_API_URL}/website/regenerate-section`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-API-Key': BRAIN_API_KEY,
+                    'Authorization': `Bearer ${token}`,
                 },
                 body: JSON.stringify(data),
             });
@@ -124,11 +127,12 @@ export const websiteService = {
     publishWebsite: async (data: WebsitePublishRequest): Promise<WebsitePublishResponse> => {
         try {
             console.log('Publishing website for:', data.businessId);
+            const token = await getFirebaseIdToken();
             const response = await fetch(`${BRAIN_API_URL}/website/publish`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-API-Key': BRAIN_API_KEY,
+                    'Authorization': `Bearer ${token}`,
                 },
                 body: JSON.stringify(data),
             });
@@ -147,11 +151,12 @@ export const websiteService = {
 
     uploadAsset: async (data: UploadAssetRequest): Promise<UploadAssetResponse> => {
         try {
+            const token = await getFirebaseIdToken();
             const response = await fetch(`${BRAIN_API_URL}/website/upload`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-API-Key': BRAIN_API_KEY,
+                    'Authorization': `Bearer ${token}`,
                 },
                 body: JSON.stringify(data),
             });

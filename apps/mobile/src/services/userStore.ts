@@ -30,6 +30,14 @@ class UserStore {
         return () => this.subscribers.delete(callback);
     }
 
+    // Set user manually (e.g. after sign up)
+    async setUser(user: User) {
+        this.user = user;
+        this.isHydrated = true;
+        this.notify();
+        await this.persistToStorage(user);
+    }
+
     // DEMO: Manually set user for demo mode (bypasses Firebase Auth)
     setDemoUser(user: User) {
         this.user = user;

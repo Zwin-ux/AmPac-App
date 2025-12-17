@@ -260,14 +260,30 @@ export interface VenturesLoanStatus {
 }
 
 export interface VenturesDashboardLog {
-    timestamp: string;
-    status: 'success' | 'error';
+    id?: string;
+    timestamp?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    status: 'success' | 'error' | 'info' | 'pending' | 'dead_letter';
     message: string;
+    loanApplicationId?: string;
+    type?: string;
+    lastError?: string;
+}
+
+export interface VenturesQueueDepth {
+    pending: number;
+    in_flight: number;
+    dead_letter: number;
 }
 
 export interface VenturesDashboardStats {
     syncedCount: number;
     pendingCount: number;
     errorCount: number;
+    queueDepth?: VenturesQueueDepth;
     recentLogs: VenturesDashboardLog[];
+    stale?: boolean;
+    lastLoopAt?: string | null;
+    lastError?: string | null;
 }

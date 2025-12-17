@@ -10,6 +10,7 @@ import { Card } from '../components/ui/Card';
 import { LoanStatusTracker } from '../components/LoanStatusTracker';
 
 const PORTAL_URL = 'https://ampac.gatewayportal.com/';
+const PARTNER_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfxX4YBsYJ8W6jOUb1to2pjhvvUFCxA80oRxhwm8_mrdisSTg/viewform';
 
 export default function ApplicationScreen() {
     // OPTIMISTIC: No blocking loading state - render immediately
@@ -17,12 +18,13 @@ export default function ApplicationScreen() {
     const [syncStatus, setSyncStatus] = useState<SyncStatus>(applicationStore.getSyncStatus());
     
     // Pre-Qual State
-    const [step, setStep] = useState<'intro' | 'questions' | 'ready'>('intro');
+    const [step, setStep] = useState<'intro' | 'questions' | 'eligible' | 'ineligible'>('intro');
     const [answers, setAnswers] = useState({
         isOwner: null as boolean | null,
         amount: '',
         years: ''
     });
+    const [reasons, setReasons] = useState<string[]>([]);
 
     // OPTIMISTIC: Subscribe to store updates
     useEffect(() => {
@@ -39,6 +41,44 @@ export default function ApplicationScreen() {
             await Linking.openURL(PORTAL_URL);
         } else {
             Alert.alert("Error", "Cannot open the portal link.");
+        }
+    };
+
+    const handleOpenPartnerForm = async () => {
+        const supported = await Linking.canOpenURL(PARTNER_FORM_URL);
+        if (supported) {
+            await Linking.openURL(PARTNER_FORM_URL);
+        } else {
+            Alert.alert("Error", "Cannot open the partner program link.");
+        }
+    };
+
+    const evaluateEligibility = () => {
+        const issues: string[] = [];
+        if (answers.isOwner === false) {
+            issues.push("Applications must be submitted by a business owner.");
+        }
+
+        const amount = parseFloat(answers.amount || '0');
+        if (!amount || isNaN(amount)) {
+            issues.push("Enter an estimated loan amount in dollars.");
+        } else {
+            if (amount < 50000) issues.push("Minimum loan request is $50,000.");
+            if (amount > 5000000) issues.push("Maximum loan request is $5,000,000 for this program.");
+        }
+
+        const years = parseFloat(answers.years || '0');
+        if (!years || isNaN(years)) {
+            issues.push("Tell us how many years the business has operated.");
+        } else if (years < 1) {
+            issues.push("We need at least 1 year in business for this program.");
+        }
+
+        setReasons(issues);
+        if (issues.length === 0) {
+            setStep('eligible');
+        } else {
+            setStep('ineligible');
         }
     };
 
@@ -109,11 +149,11 @@ export default function ApplicationScreen() {
                     <Button 
                         title="Check Eligibility" 
                         onPress={() => {
-                            if (answers.isOwner === null || !answers.amount) {
+                            if (answers.isOwner === null || !answers.amount || !answers.years) {
                                 Alert.alert("Missing Info", "Please answer all questions.");
                                 return;
                             }
-                            setStep('ready');
+                            evaluateEligibility();
                         }} 
                         style={styles.mainButton}
                     />
@@ -121,7 +161,7 @@ export default function ApplicationScreen() {
             );
         }
 
-        if (step === 'ready') {
+        if (step === 'eligible') {
             return (
                 <View style={styles.centerContent}>
                     <Ionicons name="checkmark-circle" size={80} color={theme.colors.success} style={{ marginBottom: 20 }} />
@@ -137,6 +177,34 @@ export default function ApplicationScreen() {
                         textStyle={{ fontSize: 18, fontWeight: 'bold' }}
                     />
                     <TouchableOpacity onPress={() => setStep('intro')} style={{ marginTop: 20 }}>
+                        <Text style={{ color: theme.colors.textSecondary }}>Start Over</Text>
+                    </TouchableOpacity>
+                </View>
+            );
+        }
+
+        if (step === 'ineligible') {
+            return (
+                <View style={styles.centerContent}>
+                    <Ionicons name="close-circle" size={72} color={theme.colors.error} style={{ marginBottom: 20 }} />
+                    <Text style={styles.title}>We can’t proceed right now</Text>
+                    <Text style={styles.subtitle}>
+                        Based on your answers, this application doesn’t fit our current program. You can connect with our partners for other options.
+                    </Text>
+                    {reasons.length > 0 && (
+                        <View style={styles.reasonCard}>
+                            {reasons.map((r, idx) => (
+                                <Text key={idx} style={styles.reasonText}>• {r}</Text>
+                            ))}
+                        </View>
+                    )}
+                    <Button
+                        title="View Partner Resources"
+                        onPress={handleOpenPartnerForm}
+                        style={styles.portalButton}
+                        textStyle={{ fontSize: 16, fontWeight: '700' }}
+                    />
+                    <TouchableOpacity onPress={() => setStep('intro')} style={{ marginTop: 16 }}>
                         <Text style={{ color: theme.colors.textSecondary }}>Start Over</Text>
                     </TouchableOpacity>
                 </View>
@@ -216,6 +284,22 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginBottom: 30,
         lineHeight: 24,
+    },
+    reasonCard: {
+        width: '100%',
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.borderRadius.lg,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        padding: theme.spacing.md,
+        marginBottom: theme.spacing.lg,
+        ...theme.shadows.card,
+    },
+    reasonText: {
+        fontSize: 14,
+        color: theme.colors.text,
+        marginBottom: 6,
+        lineHeight: 20,
     },
     sectionTitle: {
         fontSize: 18,

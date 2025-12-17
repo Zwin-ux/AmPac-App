@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List, Optional
 from firebase_admin import firestore
 from datetime import datetime
 import uuid
 from app.services.notification_service import notification_service
+from app.core.firebase_auth import AuthContext, get_current_user
 
 router = APIRouter()
 
@@ -27,18 +28,14 @@ class CreateMessageRequest(BaseModel):
     senderRole: str = "borrower" # Default to borrower for mobile app
 
 @router.get("/threads", response_model=List[Thread])
-async def get_threads(x_user_id: Optional[str] = Header(None)):
+async def get_threads(user: AuthContext = Depends(get_current_user)):
     """
     Get all chat threads for the current user.
     """
-    if not x_user_id:
-        # Default for demo/dev
-        x_user_id = "demo_user"
-
     db = firestore.client()
     threads_ref = db.collection("threads")
     # Simple query
-    query = threads_ref.where("borrowerId", "==", x_user_id).stream()
+    query = threads_ref.where("borrowerId", "==", user.uid).stream()
     
     results = []
     for doc in query:
@@ -48,11 +45,18 @@ async def get_threads(x_user_id: Optional[str] = Header(None)):
     return results
 
 @router.get("/threads/{thread_id}/messages", response_model=List[Message])
-async def get_messages(thread_id: str):
+async def get_messages(thread_id: str, user: AuthContext = Depends(get_current_user)):
     """
     Get messages for a specific thread.
     """
     db = firestore.client()
+    thread_doc = db.collection("threads").document(thread_id).get()
+    if not thread_doc.exists:
+        raise HTTPException(status_code=404, detail="Thread not found")
+    thread_data = thread_doc.to_dict() or {}
+    if thread_data.get("borrowerId") != user.uid and not user.is_staff:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
     messages_ref = db.collection("threads").document(thread_id).collection("messages")
     query = messages_ref.order_by("createdAt").stream()
     
@@ -64,11 +68,18 @@ async def get_messages(thread_id: str):
     return results
 
 @router.post("/threads/{thread_id}/messages", response_model=Message)
-async def send_message(thread_id: str, request: CreateMessageRequest):
+async def send_message(thread_id: str, request: CreateMessageRequest, user: AuthContext = Depends(get_current_user)):
     """
     Send a message to a thread.
     """
     db = firestore.client()
+    thread_ref = db.collection("threads").document(thread_id)
+    thread_doc = thread_ref.get()
+    if not thread_doc.exists:
+        raise HTTPException(status_code=404, detail="Thread not found")
+    thread_data = thread_doc.to_dict() or {}
+    if thread_data.get("borrowerId") != user.uid and not user.is_staff:
+        raise HTTPException(status_code=403, detail="Forbidden")
     
     msg_id = str(uuid.uuid4())
     now = datetime.utcnow()
@@ -76,7 +87,7 @@ async def send_message(thread_id: str, request: CreateMessageRequest):
     new_message = {
         "id": msg_id,
         "threadId": thread_id,
-        "senderRole": request.senderRole,
+        "senderRole": "staff" if user.is_staff else "borrower",
         "text": request.text,
         "createdAt": now
     }
@@ -85,8 +96,6 @@ async def send_message(thread_id: str, request: CreateMessageRequest):
     db.collection("threads").document(thread_id).collection("messages").document(msg_id).set(new_message)
     
     # Update thread lastMessageAt
-    # Update thread lastMessageAt
-    thread_ref = db.collection("threads").document(thread_id)
     thread_ref.update({
         "lastMessageAt": now,
         "preview": request.text[:50]
@@ -94,15 +103,14 @@ async def send_message(thread_id: str, request: CreateMessageRequest):
     
     # Send Notification
     try:
-        thread_doc = thread_ref.get()
         if thread_doc.exists:
-            thread_data = thread_doc.to_dict()
             # Determine recipient
-            if request.senderRole == 'staff':
-                recipient_id = thread_data.get('borrowerId')
+            sender_is_staff = user.is_staff
+            if sender_is_staff:
+                recipient_id = thread_data.get("borrowerId")
                 sender_name = "AmPac Staff"
             else:
-                recipient_id = thread_data.get('staffId')
+                recipient_id = thread_data.get("staffId")
                 sender_name = "Borrower"
             
             if recipient_id:
@@ -118,21 +126,18 @@ async def send_message(thread_id: str, request: CreateMessageRequest):
     return Message(**new_message)
 
 @router.post("/threads", response_model=Thread)
-async def create_thread(x_user_id: Optional[str] = Header(None)):
+async def create_thread(user: AuthContext = Depends(get_current_user)):
     """
     Create a new thread (mostly for testing/init).
     """
-    if not x_user_id:
-        x_user_id = "demo_user"
-        
     db = firestore.client()
     thread_id = str(uuid.uuid4())
     now = datetime.utcnow()
     
     new_thread = {
         "id": thread_id,
-        "borrowerId": x_user_id,
-        "staffId": "staff_001",
+        "borrowerId": user.uid,
+        "staffId": None,
         "lastMessageAt": now,
         "preview": "New conversation started"
     }
@@ -146,7 +151,7 @@ class ChatCompletionRequest(BaseModel):
     stream: bool = False
 
 @router.post("/completions")
-async def chat_completions(request: ChatCompletionRequest):
+async def chat_completions(request: ChatCompletionRequest, user: AuthContext = Depends(get_current_user)):
     """
     OpenAI-compatible chat completion endpoint for RAG.
     """

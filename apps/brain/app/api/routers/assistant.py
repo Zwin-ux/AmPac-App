@@ -1,6 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from typing import Optional
+from app.core.firebase_auth import AuthContext, get_current_user
 from app.services.llm_service import llm_service
 
 router = APIRouter()
@@ -8,13 +8,12 @@ router = APIRouter()
 class AssistantRequest(BaseModel):
     context: str # e.g., 'application', 'home', 'spaces'
     query: str
-    userId: Optional[str] = None
 
 class AssistantResponse(BaseModel):
     response: str
 
 @router.post("/chat", response_model=AssistantResponse)
-async def chat_assistant(request: AssistantRequest):
+async def chat_assistant(request: AssistantRequest, user: AuthContext = Depends(get_current_user)):
     """
     Context-aware assistant chat.
     """

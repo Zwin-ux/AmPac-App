@@ -9,7 +9,7 @@ import {
     updateDoc,
     Timestamp,
     onSnapshot,
-    Unsubscribe
+    type Unsubscribe
 } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import type { Application, ApplicationStatus, ApplicationFlag } from '../types';

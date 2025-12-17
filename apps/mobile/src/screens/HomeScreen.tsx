@@ -94,26 +94,40 @@ export default function HomeScreen() {
                             venturesStatus={activeApplication.venturesStatus}
                         />
                     </View>
+                ) : user?.businessName ? (
+                    <Card style={styles.businessCard}>
+                        <View style={styles.businessHeader}>
+                            <Text style={styles.businessLabel}>YOUR BUSINESS</Text>
+                            <Ionicons name="trending-up" size={20} color={theme.colors.accent} />
+                        </View>
+                        <Text style={styles.businessName}>{user.businessName}</Text>
+                        <View style={styles.businessStats}>
+                            <View>
+                                <Text style={styles.statLabel}>STATUS</Text>
+                                <Text style={styles.statValue}>Active</Text>
+                            </View>
+                            <View>
+                                <Text style={styles.statLabel}>MEMBER SINCE</Text>
+                                <Text style={styles.statValue}>2023</Text>
+                            </View>
+                        </View>
+                    </Card>
                 ) : (
-                    user?.businessName && (
-                        <Card style={styles.businessCard}>
-                            <View style={styles.businessHeader}>
-                                <Text style={styles.businessLabel}>YOUR BUSINESS</Text>
-                                <Ionicons name="trending-up" size={20} color={theme.colors.accent} />
+                    <Card style={styles.startAppCard}>
+                        <View style={styles.startAppContent}>
+                            <View style={styles.startAppText}>
+                                <Text style={styles.startAppTitle}>Get Funded</Text>
+                                <Text style={styles.startAppDesc}>Start your SBA 504 or Community Loan application in minutes.</Text>
                             </View>
-                            <Text style={styles.businessName}>{user.businessName}</Text>
-                            <View style={styles.businessStats}>
-                                <View>
-                                    <Text style={styles.statLabel}>STATUS</Text>
-                                    <Text style={styles.statValue}>Active</Text>
-                                </View>
-                                <View>
-                                    <Text style={styles.statLabel}>MEMBER SINCE</Text>
-                                    <Text style={styles.statValue}>2023</Text>
-                                </View>
-                            </View>
-                        </Card>
-                    )
+                            <Ionicons name="rocket" size={48} color="rgba(255,255,255,0.2)" />
+                        </View>
+                        <Button 
+                            title="Start Application" 
+                            onPress={() => navigation.navigate('Apply')}
+                            style={{ backgroundColor: 'white' }}
+                            textStyle={{ color: theme.colors.primary, fontWeight: 'bold' }}
+                        />
+                    </Card>
                 )}
 
                 <Text style={styles.sectionTitle}>Tools & Services</Text>
@@ -258,5 +272,33 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         color: theme.colors.text,
         marginTop: theme.spacing.sm,
+    },
+    startAppCard: {
+        backgroundColor: theme.colors.primary,
+        padding: theme.spacing.lg,
+        marginBottom: theme.spacing.xl,
+        borderRadius: theme.borderRadius.lg,
+        ...theme.shadows.float,
+    },
+    startAppContent: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: theme.spacing.lg,
+    },
+    startAppText: {
+        flex: 1,
+        marginRight: theme.spacing.md,
+    },
+    startAppTitle: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: 'white',
+        marginBottom: 4,
+    },
+    startAppDesc: {
+        fontSize: 14,
+        color: 'rgba(255,255,255,0.9)',
+        lineHeight: 20,
     },
 });

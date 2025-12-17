@@ -10,6 +10,8 @@ import { Timestamp } from 'firebase/firestore';
 import { pricingService } from '../services/pricing';
 import { graphCalendarService } from '../services/microsoftGraph';
 import { availabilityService } from '../services/availability';
+import { Ionicons } from '@expo/vector-icons';
+import { notifySupportChannel } from '../services/notifications';
 
 export default function RoomDetailScreen() {
     const route = useRoute<any>();
@@ -34,26 +36,6 @@ export default function RoomDetailScreen() {
         }),
         [room, slotStart, slotEnd, attendees]
     );
-
-    const pingTeams = async () => {
-        const url = "https://defaultcf0a93381f994a5ab494afb40f401d.da.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/b0837f8db0ab469abf2e8fcfff3cd97d/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=2qQJIDuLxK0fuiwyiZUAAx1Te7vPT2JZiaWvO2yb48k";
-        try {
-            await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    roomId: room.id,
-                    roomName: room.name,
-                    start: slotStart.toDate().toISOString(),
-                    end: slotEnd.toDate().toISOString(),
-                    attendees,
-                    price: pricing.priceBreakdown.total,
-                }),
-            });
-        } catch (err) {
-            console.warn('Teams webhook failed', err);
-        }
-    };
 
     // Mock booking logic for MVP
     const handleBookNow = async () => {
@@ -107,8 +89,11 @@ export default function RoomDetailScreen() {
             };
 
             await createBooking(booking);
-            // Fire-and-forget notification to Teams workflow
-            pingTeams();
+            // Fire-and-forget support notification (server-side Teams webhook)
+            notifySupportChannel({
+                title: 'New Room Booking',
+                body: `Room: ${room.name} (${room.id})\nStart: ${slotStart.toDate().toISOString()}\nEnd: ${slotEnd.toDate().toISOString()}\nAttendees: ${attendees}\nTotal: ${pricing.priceBreakdown.total}`,
+            });
 
             Alert.alert(
                 'Booking Confirmed',

@@ -66,10 +66,20 @@ export default function ProfileScreen({ navigation }: any) {
 
     const handleSignOut = async () => {
         try {
-            await cacheService.clear(); // Clear cache on sign out
+            // Attempt to clear local data, but don't block sign out
+            try {
+                await cacheService.clear();
+                const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+                await AsyncStorage.clear();
+            } catch (e) {
+                console.warn("Cache clear failed", e);
+            }
+            
             await signOut(auth);
         } catch (error) {
             console.error("Error signing out:", error);
+            // Force navigation to login if auth fails (fallback)
+            // navigation.reset(...) - handled by App.tsx state change usually
         }
     };
 

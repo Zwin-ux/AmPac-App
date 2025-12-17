@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2 } from "lucide-react";
+import { API_URL } from '../config';
 
 export const AuthCallbackPage: React.FC = () => {
     const [searchParams] = useSearchParams();
@@ -19,7 +20,7 @@ export const AuthCallbackPage: React.FC = () => {
 
     const exchangeCode = async (code: string) => {
         try {
-            const res = await fetch("http://localhost:8000/api/v1/m365/auth/exchange", {
+            const res = await fetch(`${API_URL}/m365/auth/exchange`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

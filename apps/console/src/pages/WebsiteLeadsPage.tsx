@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { leadsService, WebsiteLead } from '../services/leadsService';
-import { format } from 'date-fns';
+import { leadsService, type WebsiteLead } from '../services/leadsService';
+
+const formatCsvDate = (date: Date) => date.toISOString().slice(0, 16).replace('T', ' ');
+const formatUiDate = (date: Date) => date.toLocaleString();
 
 export default function WebsiteLeadsPage() {
     const [leads, setLeads] = useState<WebsiteLead[]>([]);
@@ -23,7 +25,7 @@ export default function WebsiteLeadsPage() {
             `"${(l.message || '').replace(/"/g, '""')}"`,
             `"${l.siteId || ''}"`,
             `"${l.slug || ''}"`,
-            `"${l.createdAt ? format(l.createdAt.toDate(), 'yyyy-MM-dd HH:mm') : ''}"`
+            `"${l.createdAt ? formatCsvDate(l.createdAt.toDate()) : ''}"`
         ]);
         const csv = [header.join(','), ...rows.map(r => r.join(','))].join('\n');
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -76,7 +78,7 @@ export default function WebsiteLeadsPage() {
                                     <td className="px-4 py-3 max-w-xs truncate" title={lead.message}>{lead.message}</td>
                                     <td className="px-4 py-3 text-textSecondary">{lead.slug || lead.siteId}</td>
                                     <td className="px-4 py-3 text-textSecondary">
-                                        {lead.createdAt ? format(lead.createdAt.toDate(), 'MMM d, yyyy HH:mm') : ''}
+                                        {lead.createdAt ? formatUiDate(lead.createdAt.toDate()) : ''}
                                     </td>
                                 </tr>
                             ))}

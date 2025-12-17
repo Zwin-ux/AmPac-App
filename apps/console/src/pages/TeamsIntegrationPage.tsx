@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, MessageSquare, Calendar, Video, Settings, Search, Plus, MoreVertical } from 'lucide-react';
-import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, Timestamp } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import { Users, MessageSquare, Search, Plus, MoreVertical } from 'lucide-react';
 
 // Mock data for development
 export interface TeamIntegration {
@@ -91,18 +89,14 @@ export default function TeamsIntegrationPage() {
         try {
             setLoading(true);
             // In a real implementation, this would call Microsoft Graph to create a team
-            const newTeamData = {
-                ...newTeam,
-                connectedAt: Timestamp.now(),
-                status: 'active',
-                lastSync: Timestamp.now()
-            };
-            
+
             // For now, we'll just add to local state
             setTeams([...teams, {
                 id: Math.random().toString(36).substring(2, 9),
-                ...newTeamData,
+                teamName: newTeam.teamName,
+                teamId: newTeam.teamId,
                 connectedAt: new Date(),
+                status: 'active',
                 lastSync: new Date()
             }]);
             

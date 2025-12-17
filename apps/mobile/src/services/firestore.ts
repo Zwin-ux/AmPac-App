@@ -47,7 +47,7 @@ export const createHotlineRequest = async (
     userId: string,
     topic: string,
     message: string
-): Promise<void> => {
+): Promise<boolean> => {
     try {
         const hotlineCollectionRef = collection(db, 'hotlineRequests');
         await addDoc(hotlineCollectionRef, {
@@ -57,8 +57,13 @@ export const createHotlineRequest = async (
             status: 'open',
             createdAt: serverTimestamp(),
         });
-    } catch (error) {
+        return true;
+    } catch (error: any) {
         console.error("Error creating hotline request:", error);
-        throw error;
+        // In demo/dev environments with locked-down rules, fail soft so webhook can still notify staff.
+        if (error?.code === 'permission-denied' || error?.message?.includes('insufficient permissions')) {
+            return false;
+        }
+        return false;
     }
 };

@@ -6,6 +6,7 @@ import { theme } from '../theme';
 import { createHotlineRequest } from '../services/firestore';
 import { auth } from '../../firebaseConfig';
 import AssistantBubble from '../components/AssistantBubble';
+import { notifySupportChannel } from '../services/notifications';
 
 export default function HotlineScreen() {
     const [subject, setSubject] = useState('');
@@ -22,14 +23,30 @@ export default function HotlineScreen() {
 
         setLoading(true);
         try {
-            // In dev mode, we might not have a user, so handle gracefully
-            const uid = auth.currentUser?.uid || 'dev-user';
+            if (!auth.currentUser) {
+                Alert.alert('Sign in required', 'Please sign in to contact support.');
+                return;
+            }
+            const uid = auth.currentUser.uid;
 
-            await createHotlineRequest(
+            const stored = await createHotlineRequest(
                 uid,
                 subject,
                 message
             );
+
+            const notified = await notifySupportChannel({
+                title: 'New Support Hotline Request',
+                body: `Subject: ${subject}\nMessage: ${message}\nUser: ${uid}`,
+            });
+
+            if (!stored) {
+                console.warn('Hotline Firestore write failed; likely permissions. Proceeding with webhook only.');
+            }
+            if (!notified) {
+                Alert.alert('Warning', 'We could not notify support automatically. Please try again.');
+                return;
+            }
 
             Alert.alert('Success', 'Your request has been sent to AmPac support.');
             setSubject('');
@@ -122,14 +139,26 @@ export default function HotlineScreen() {
                                 <TouchableOpacity
                                     key={time}
                                     style={styles.timeSlot}
-                                    onPress={() => {
-                                        setModalVisible(false);
-                                        Alert.alert('Request Sent', `We have received your request for a ${time} session.`);
-                                    }}
-                                >
-                                    <Text style={styles.timeSlotText}>{time}</Text>
-                                </TouchableOpacity>
-                            ))}
+                            onPress={async () => {
+                                setModalVisible(false);
+                                Alert.alert('Request Sent', `We have received your request for a ${time} session.`);
+                                if (!auth.currentUser) {
+                                    Alert.alert('Sign in required', 'Please sign in to request a session.');
+                                    return;
+                                }
+                                const uid = auth.currentUser.uid;
+                                const notified = await notifySupportChannel({
+                                    title: 'Technical Assistance Request',
+                                    body: `Preferred time: ${time}\nUser: ${uid}`,
+                                });
+                                if (!notified) {
+                                    Alert.alert('Warning', 'We could not notify support automatically. Please try again.');
+                                }
+                            }}
+                        >
+                            <Text style={styles.timeSlotText}>{time}</Text>
+                        </TouchableOpacity>
+                    ))}
                         </View>
 
                         <TouchableOpacity

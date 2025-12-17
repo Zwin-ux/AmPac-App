@@ -16,6 +16,8 @@ class MockBucket:
         print(f"[MockBucket] Accessing blob: {path}")
         return MagicMock()
 
+import json
+
 def _ensure_app():
     try:
         return firebase_admin.get_app()
@@ -26,12 +28,25 @@ def _ensure_app():
             return firebase_admin.initialize_app(cred, {
                 "storageBucket": settings.STORAGE_BUCKET
             })
+        elif settings.FIREBASE_CREDENTIALS_JSON:
+            try:
+                cred_dict = json.loads(settings.FIREBASE_CREDENTIALS_JSON)
+                cred = credentials.Certificate(cred_dict)
+                return firebase_admin.initialize_app(cred, {
+                    "storageBucket": settings.STORAGE_BUCKET
+                })
+            except Exception as e:
+                print(f"Error loading Firebase credentials from JSON: {e}")
+                return firebase_admin.initialize_app(options={"storageBucket": settings.STORAGE_BUCKET})
         else:
             return firebase_admin.initialize_app(options={"storageBucket": settings.STORAGE_BUCKET})
 
+def ensure_firebase_app():
+    return _ensure_app()
+
 def get_db():
     try:
-        _ensure_app()
+        ensure_firebase_app()
         return firestore.client()
     except Exception as e:
         print(f"Firebase Init Error (db): {e}")
@@ -39,7 +54,7 @@ def get_db():
 
 def get_bucket():
     try:
-        _ensure_app()
+        ensure_firebase_app()
         bucket_name = settings.STORAGE_BUCKET
         if bucket_name:
             return storage.bucket(bucket_name)
@@ -47,4 +62,3 @@ def get_bucket():
     except Exception as e:
         print(f"Firebase Init Error (bucket): {e}")
         return MockBucket()
-

@@ -14,7 +14,11 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "This app uses the photo library to let you upload profile pictures and share images in chat.",
+        "NSCameraUsageDescription": "This app uses the camera to let you take profile pictures and share photos in chat."
+      }
     },
     "android": {
       "adaptiveIcon": {

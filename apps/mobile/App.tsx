@@ -22,6 +22,8 @@ import BusinessProfileScreen from './src/screens/BusinessProfileScreen';
 import WebsiteBuilderScreen from './src/screens/WebsiteBuilderScreen';
 import PaymentScreen from './src/screens/PaymentScreen';
 import FeedScreen from './src/screens/FeedScreen';
+import ChatListScreen from './src/screens/ChatListScreen';
+import ChatScreenWrapper from './src/screens/ChatScreenWrapper';
 
 // Types
 import { theme } from './src/theme';
@@ -42,6 +44,9 @@ function SpacesNavigator() {
     </SpacesStack.Navigator>
   );
 }
+
+// New Import
+import SocialHubScreen from './src/screens/SocialHubScreen';
 
 function MainTabs() {
   return (
@@ -64,10 +69,8 @@ function MainTabs() {
               iconName = focused ? 'document-text' : 'document-text-outline';
             } else if (route.name === 'Spaces') {
               iconName = focused ? 'business' : 'business-outline';
-            } else if (route.name === 'Network') {
+            } else if (route.name === 'Social') {
               iconName = focused ? 'people' : 'people-outline';
-            } else if (route.name === 'Profile') {
-              iconName = focused ? 'person' : 'person-outline';
             } else if (route.name === 'Support') {
               iconName = focused ? 'help-buoy' : 'help-buoy-outline';
             }
@@ -79,13 +82,12 @@ function MainTabs() {
         <Tab.Screen name="HomeTab" component={HomeScreen} options={{ title: 'Home' }} />
         <Tab.Screen name="Apply" component={ApplicationScreen} />
         <Tab.Screen name="Spaces" component={SpacesNavigator} />
-        <Tab.Screen name="Network" component={NetworkScreen} />
+        <Tab.Screen name="Social" component={SocialHubScreen} />
         <Tab.Screen
           name="Support"
           component={HotlineScreen}
           options={{ title: 'Support' }}
         />
-        <Tab.Screen name="Profile" component={ProfileScreen} />
       </Tab.Navigator>
     </>
   );
@@ -104,6 +106,8 @@ function AppStack() {
     const authUnsubscribe = onAuthStateChanged(auth, async (u) => {
       if (u) {
         await userStore.syncWithServer();
+      } else {
+        await userStore.clearUser();
       }
     });
 
@@ -134,6 +138,8 @@ function AppStack() {
           <Stack.Screen name="Payment" component={PaymentScreen} />
           <Stack.Screen name="Feed" component={FeedScreen} />
           <Stack.Screen name="Network" component={NetworkScreen} />
+          <Stack.Screen name="Chat" component={ChatScreenWrapper} />
+          <Stack.Screen name="Profile" component={ProfileScreen} />
         </>
       ) : (
         <>

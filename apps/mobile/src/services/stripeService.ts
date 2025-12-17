@@ -1,4 +1,5 @@
 import { API_URL } from '../config';
+import { getFirebaseIdToken } from './brainAuth';
 
 const BRAIN_API_URL = API_URL;
 
@@ -34,11 +35,12 @@ export interface StripeCheckoutSession {
 export const stripeService = {
     createCustomer: async (email: string, name: string, metadata?: Record<string, string>): Promise<StripeCustomer> => {
         try {
+            const token = await getFirebaseIdToken();
             const response = await fetch(`${BRAIN_API_URL}/stripe/customers`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-API-Key': BRAIN_API_KEY,
+                    'Authorization': `Bearer ${token}`,
                 },
                 body: JSON.stringify({ email, name, metadata }),
             });
@@ -57,11 +59,12 @@ export const stripeService = {
 
     createPaymentIntent: async (customerId: string, amount: number, currency: string = 'usd', metadata?: Record<string, string>): Promise<StripePaymentIntent> => {
         try {
+            const token = await getFirebaseIdToken();
             const response = await fetch(`${BRAIN_API_URL}/stripe/payment-intents`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-API-Key': BRAIN_API_KEY,
+                    'Authorization': `Bearer ${token}`,
                 },
                 body: JSON.stringify({ customer_id: customerId, amount, currency, metadata }),
             });
@@ -80,11 +83,12 @@ export const stripeService = {
 
     createSubscription: async (customerId: string, priceId: string, metadata?: Record<string, string>): Promise<StripeSubscription> => {
         try {
+            const token = await getFirebaseIdToken();
             const response = await fetch(`${BRAIN_API_URL}/stripe/subscriptions`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-API-Key': BRAIN_API_KEY,
+                    'Authorization': `Bearer ${token}`,
                 },
                 body: JSON.stringify({ customer_id: customerId, price_id: priceId, metadata }),
             });
@@ -103,11 +107,12 @@ export const stripeService = {
 
     createCheckoutSession: async (priceId: string, customerId: string, successUrl: string, cancelUrl: string): Promise<StripeCheckoutSession> => {
         try {
+            const token = await getFirebaseIdToken();
             const response = await fetch(`${BRAIN_API_URL}/stripe/checkout-sessions`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-API-Key': BRAIN_API_KEY,
+                    'Authorization': `Bearer ${token}`,
                 },
                 body: JSON.stringify({ price_id: priceId, customer_id: customerId, success_url: successUrl, cancel_url: cancelUrl }),
             });
@@ -126,11 +131,12 @@ export const stripeService = {
 
     listPaymentIntents: async (customerId: string): Promise<StripePaymentIntent[]> => {
         try {
+            const token = await getFirebaseIdToken();
             const response = await fetch(`${BRAIN_API_URL}/stripe/payment-intents/${customerId}`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-API-Key': BRAIN_API_KEY,
+                    'Authorization': `Bearer ${token}`,
                 },
             });
 

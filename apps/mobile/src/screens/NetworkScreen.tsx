@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, ScrollView, Modal, Alert } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, ScrollView, Modal, Alert, Linking } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../theme';
@@ -9,14 +9,18 @@ import { getEvents, createEvent } from '../services/events';
 import { feedService, FeedItem } from '../services/feedService';
 import { Ionicons } from '@expo/vector-icons';
 
+import { AMPAC_STAFF, StaffMember } from '../data/staff';
 import AssistantBubble from '../components/AssistantBubble';
 
 export default function NetworkScreen() {
-    const [activeTab, setActiveTab] = useState<'businesses' | 'events' | 'feed'>('businesses');
+    const [activeTab, setActiveTab] = useState<'businesses' | 'events' | 'feed' | 'staff'>('businesses');
     
     // Business State
     const [businesses, setBusinesses] = useState<Business[]>([]);
     const [loadingBusinesses, setLoadingBusinesses] = useState(true);
+    
+    // Staff State
+    const [staff, setStaff] = useState<StaffMember[]>(AMPAC_STAFF);
     
     // Event State
     const [events, setEvents] = useState<Event[]>([]);
@@ -125,6 +129,31 @@ export default function NetworkScreen() {
         item.type.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
+    const filteredStaff = AMPAC_STAFF.filter(s =>
+        s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.title.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const handleCall = (phone: string) => {
+        Linking.openURL(`tel:${phone.replace(/\D/g, '')}`);
+    };
+
+    const renderStaffItem = ({ item }: { item: StaffMember }) => (
+        <View style={styles.card}>
+            <View style={[styles.avatarPlaceholder, { backgroundColor: theme.colors.primary }]}>
+                <Text style={[styles.avatarText, { color: '#fff' }]}>{item.name.charAt(0)}</Text>
+            </View>
+            <View style={styles.cardContent}>
+                <Text style={styles.businessName}>{item.name}</Text>
+                <Text style={styles.industry}>{item.title}</Text>
+                <TouchableOpacity style={[styles.connectButton, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }]} onPress={() => handleCall(item.phone)}>
+                    <Ionicons name="call-outline" size={16} color={theme.colors.primary} style={{ marginRight: 4 }} />
+                    <Text style={styles.connectButtonText}>{item.phone}</Text>
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
+
     const renderBusinessItem = ({ item }: { item: Business }) => (
         <View style={styles.card}>
             <View style={styles.avatarPlaceholder}>
@@ -224,6 +253,12 @@ export default function NetworkScreen() {
                 {/* Tabs */}
                 <View style={styles.tabContainer}>
                     <TouchableOpacity 
+                        style={[styles.tab, activeTab === 'staff' && styles.activeTab]} 
+                        onPress={() => setActiveTab('staff')}
+                    >
+                        <Text style={[styles.tabText, activeTab === 'staff' && styles.activeTabText]}>AmPac Team</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
                         style={[styles.tab, activeTab === 'businesses' && styles.activeTab]} 
                         onPress={() => setActiveTab('businesses')}
                     >
@@ -247,11 +282,13 @@ export default function NetworkScreen() {
                     <TextInput
                         style={styles.searchInput}
                         placeholder={
-                            activeTab === 'businesses'
-                                ? "Search businesses..."
-                                : activeTab === 'events'
-                                    ? "Search events..."
-                                    : "Search posts..."
+                            activeTab === 'staff'
+                                ? "Search team..."
+                                : activeTab === 'businesses'
+                                    ? "Search businesses..."
+                                    : activeTab === 'events'
+                                        ? "Search events..."
+                                        : "Search posts..."
                         }
                         placeholderTextColor={theme.colors.textSecondary}
                         value={searchQuery}
@@ -283,7 +320,15 @@ export default function NetworkScreen() {
                 )}
             </View>
 
-            {activeTab === 'businesses' ? (
+            {activeTab === 'staff' ? (
+                <FlatList
+                    data={filteredStaff}
+                    renderItem={renderStaffItem}
+                    keyExtractor={item => item.id}
+                    contentContainerStyle={styles.listContent}
+                    showsVerticalScrollIndicator={false}
+                />
+            ) : activeTab === 'businesses' ? (
                 <FlatList
                     data={filteredBusinesses}
                     renderItem={renderBusinessItem}

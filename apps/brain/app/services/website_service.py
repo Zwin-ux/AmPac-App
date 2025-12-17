@@ -343,19 +343,43 @@ class WebsiteService:
         }
         
         doc = website_ref.get()
+        if doc.exists:
+            existing = doc.to_dict() or {}
+            existing_owner = existing.get("ownerId")
+            if existing_owner and existing_owner != owner_id:
+                raise PermissionError("Not authorized to publish this site")
+
         if not doc.exists:
             website_data["createdAt"] = datetime.utcnow()
             website_data["visitCount"] = 0
         
         website_ref.set(website_data, merge=True)
         
-        project_id = "ampac-a325f" # Updated to correct project ID
-        region = "us-central1"
-        public_url = f"https://{region}-{project_id}.cloudfunctions.net/serveWebsite?id={business_id}&slug={site_slug}"
+        # K8s Deployment URL
+        # Assuming the ingress is set up at ampac.business or similar
+        # For local dev, it might be localhost:8000/api/v1/website/sites/{slug}
+        settings = get_settings()
+        base_url = os.getenv("PUBLIC_SITE_BASE_URL") or f"https://brain-service-952649324958.us-central1.run.app{settings.API_V1_STR}/website/sites"
+        public_url = f"{base_url}/{site_slug}"
         
         website_ref.update({"publicUrl": public_url})
         
         return {"url": public_url, "status": "published", "slug": site_slug}
+
+    async def get_website_by_slug(self, slug: str) -> str:
+        """
+        Retrieves the HTML content for a published website by its slug.
+        """
+        db = get_db()
+        websites_ref = db.collection("websites")
+        query = websites_ref.where("slug", "==", slug).where("isPublished", "==", True).limit(1)
+        docs = query.stream()
+        
+        for doc in docs:
+            data = doc.to_dict()
+            return data.get("htmlContent", "")
+            
+        return None
 
     async def save_lead(self, site_id: str | None, slug: str | None, name: str, email: str, message: str) -> str:
         db = get_db()

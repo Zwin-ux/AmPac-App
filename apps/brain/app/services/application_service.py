@@ -9,7 +9,7 @@ class ApplicationService:
         self.db = get_db()
         self.collection = self.db.collection('applications')
 
-    async def create_application(self, data: ApplicationCreate) -> ApplicationResponse:
+    async def create_application(self, user_id: str, data: ApplicationCreate) -> ApplicationResponse:
         app_id = str(uuid.uuid4())
         now = datetime.utcnow()
         
@@ -41,6 +41,7 @@ class ApplicationService:
         app_dict = data.model_dump(exclude_none=True)
         app_dict.update({
             "id": app_id,
+            "userId": user_id,
             "status": ApplicationStatus.DRAFT,
             "createdAt": now,
             "updatedAt": now,

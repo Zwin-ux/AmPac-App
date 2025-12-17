@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, CheckCircle } from "lucide-react";
+import { API_URL } from '../config';
 
 export const ConnectM365Button: React.FC = () => {
     const [status, setStatus] = useState<"idle" | "loading" | "connected" | "error">("idle");
@@ -11,7 +12,7 @@ export const ConnectM365Button: React.FC = () => {
 
     const checkStatus = async () => {
         try {
-            const res = await fetch("http://localhost:8000/api/v1/m365/status");
+            const res = await fetch(`${API_URL}/m365/status`);
             const data = await res.json();
             if (data.connected) {
                 setStatus("connected");
@@ -25,7 +26,7 @@ export const ConnectM365Button: React.FC = () => {
         setStatus("loading");
         try {
             // 1. Get Login URL from Backend
-            const urlRes = await fetch(`http://localhost:8000/api/v1/m365/auth/login_url?redirect_uri=${encodeURIComponent(window.location.origin + "/auth/callback")}`);
+            const urlRes = await fetch(`${API_URL}/m365/auth/login_url?redirect_uri=${encodeURIComponent(window.location.origin + "/auth/callback")}`);
             const urlData = await urlRes.json();
 
             // 2. Redirect

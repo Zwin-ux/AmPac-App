@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: brain-worker
+  namespace: default
+  labels:
+    app: brain-worker
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: brain-worker
+  template:
+    metadata:
+      labels:
+        app: brain-worker
+    spec:
+      containers:
+      - name: brain-worker
+        image: gcr.io/ampac-a325f/brain-service:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          failureThreshold: 12
+          periodSeconds: 5
+        env:
+        - name: SKIP_SYNC_LOOP
+          value: "false"
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: brain-secrets
+              key: openai-api-key
+        - name: TEAMS_WEBHOOK_URL
+          valueFrom:
+            secretKeyRef:
+              name: brain-secrets
+              key: teams-webhook-url
+        - name: FIREBASE_CREDENTIALS_JSON
+          valueFrom:
+            secretKeyRef:
+              name: brain-secrets
+              key: firebase-credentials
+        - name: PUBLIC_SITE_BASE_URL
+          value: "https://ampac.business/sites"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 2
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 2
+

@@ -166,6 +166,47 @@ export default function EditProfileScreen({ navigation }: any) {
                         keyboardType="url"
                     />
                 </View>
+
+                {/* --- Business Card Customization --- */}
+                <View style={[styles.section, { marginTop: 16 }]}>
+                    <Text style={styles.sectionTitle}>Business Card Style</Text>
+                    
+                    {/* Card Color */}
+                    <Text style={styles.label}>Card Color</Text>
+                    <View style={styles.colorRow}>
+                        {['#1E88E5', '#43A047', '#E53935', '#FB8C00', '#8E24AA', '#546E7A', '#212121'].map(color => (
+                            <TouchableOpacity
+                                key={color}
+                                style={[
+                                    styles.colorSwatch, 
+                                    { backgroundColor: color },
+                                    formData.cardColor === color && styles.colorSwatchActive
+                                ]}
+                                onPress={() => updateField('cardColor', color)}
+                            />
+                        ))}
+                    </View>
+
+                    {/* Business Status */}
+                    <Text style={styles.label}>Business Stage</Text>
+                    <View style={styles.chipRow}>
+                        {['idea', 'startup', 'scaling', 'established'].map(status => (
+                            <TouchableOpacity
+                                key={status}
+                                style={[
+                                    styles.chip,
+                                    formData.businessStatus === status && styles.chipActive
+                                ]}
+                                onPress={() => updateField('businessStatus', status)}
+                            >
+                                <Text style={[
+                                    styles.chipText,
+                                    formData.businessStatus === status && styles.chipTextActive
+                                ]}>{status.charAt(0).toUpperCase() + status.slice(1)}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
             </ScrollView>
         </SafeAreaView>
     );
@@ -237,5 +278,58 @@ const styles = StyleSheet.create({
     },
     textArea: {
         minHeight: 100,
+    },
+    section: {
+        marginBottom: 24,
+        paddingTop: 16,
+        borderTopWidth: 1,
+        borderTopColor: '#eee',
+    },
+    sectionTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginBottom: 16,
+        color: theme.colors.text,
+    },
+    colorRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginBottom: 16,
+    },
+    colorSwatch: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        marginRight: 12,
+        marginBottom: 12,
+        borderWidth: 2,
+        borderColor: 'transparent',
+    },
+    colorSwatchActive: {
+        borderColor: theme.colors.text,
+        transform: [{ scale: 1.1 }],
+    },
+    chipRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+    },
+    chip: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: '#f0f0f0',
+        marginRight: 8,
+        marginBottom: 8,
+    },
+    chipActive: {
+        backgroundColor: theme.colors.primary,
+    },
+    chipText: {
+        color: '#666',
+        fontSize: 14,
+    },
+    chipTextActive: {
+        color: '#fff',
+        fontWeight: 'bold',
     },
 });

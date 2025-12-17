@@ -3,6 +3,10 @@ node_modules/
 .env
 .DS_Store
 
+# Python bytecode
+__pycache__/
+*.pyc
+
 # Brain Secrets (Override)
 apps/brain/serviceAccountKey.json
 apps/brain/*.json

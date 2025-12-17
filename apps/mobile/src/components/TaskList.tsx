@@ -5,6 +5,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import { Task } from '../types';
 import { theme } from '../theme';
 import { Card } from './ui/Card';
+import { API_URL } from '../config';
+import { getFirebaseIdToken } from '../services/brainAuth';
 
 interface TaskListProps {
   tasks: Task[];
@@ -36,15 +38,13 @@ export const TaskList: React.FC<TaskListProps> = ({ tasks, onRefresh }) => {
       } as any);
 
       // Upload to Brain
-      // Note: Replace with your actual Brain API URL from config/env
-      const API_URL = 'http://10.0.2.2:8000/api/v1'; // Android Emulator localhost
-      // For physical device, use your machine's IP
-      
+      const token = await getFirebaseIdToken();
       const response = await fetch(`${API_URL}/documents/upload`, {
         method: 'POST',
         body: formData,
         headers: {
           'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`,
         },
       });
 

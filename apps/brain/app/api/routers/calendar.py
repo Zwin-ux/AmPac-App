@@ -1,18 +1,23 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, timedelta
+from app.core.config import get_settings
+from app.core.firebase_auth import AuthContext, get_current_user
 from app.services.graph_service import GraphService
+from app.services.circuit_breaker import get_breaker
 from firebase_admin import firestore
 import uuid
 
 router = APIRouter()
+settings = get_settings()
+graph_breaker = get_breaker("graph")
 
 class BookingRequest(BaseModel):
     staffEmail: str
-    borrowerEmail: str
     durationMinutes: int
     chosenStartTime: str # ISO format
+    borrowerEmail: Optional[str] = None  # deprecated; derived from Firebase token when available
 
 class AvailabilityRequest(BaseModel):
     staffEmail: str
@@ -62,7 +67,24 @@ def _generate_suggested_slots(start_dt: datetime, end_dt: datetime, duration_min
     return suggestions
 
 @router.post("/available")
-async def get_available_slots(request: AvailabilityRequest):
+async def get_available_slots(request: AvailabilityRequest, user: AuthContext = Depends(get_current_user)):
+    if not settings.BOOKINGS_ENABLED or not settings.GRAPH_ENABLED:
+        raise HTTPException(status_code=503, detail="Calendar booking is disabled.")
+    if settings.GRAPH_MOCK:
+        return {
+            "busy": [],
+            "suggested": _generate_suggested_slots(
+                _parse_iso(request.start, datetime.utcnow()),
+                _parse_iso(request.end, datetime.utcnow() + timedelta(days=7)),
+                request.durationMinutes,
+                []
+            ),
+            "timeZone": "UTC",
+            "mode": "mock"
+        }
+    if graph_breaker.state == "open" and not graph_breaker.allow_request():
+        raise HTTPException(status_code=503, detail="Graph temporarily unavailable (breaker open).")
+
     service = GraphService()
     
     start_dt = _parse_iso(request.start, datetime.utcnow())
@@ -74,6 +96,7 @@ async def get_available_slots(request: AvailabilityRequest):
         start_dt,
         end_dt
     )
+    graph_breaker.record_success()
     
     # Process items to find conflicts
     # We return a simplified list of busy slots for the frontend to subtract from available time
@@ -104,7 +127,42 @@ async def get_available_slots(request: AvailabilityRequest):
     }
 
 @router.post("/book")
-async def book_meeting(request: BookingRequest):
+async def book_meeting(request: BookingRequest, user: AuthContext = Depends(get_current_user)):
+    if not settings.BOOKINGS_ENABLED or not settings.GRAPH_ENABLED:
+        raise HTTPException(status_code=503, detail="Calendar booking is disabled.")
+
+    borrower_email = user.email or request.borrowerEmail
+    if not borrower_email:
+        raise HTTPException(status_code=400, detail="Borrower email missing; sign in with an email-based account.")
+    if settings.GRAPH_MOCK:
+        mock_event_id = f"mock-event-{uuid.uuid4()}"
+        mock_join_url = "https://teams.microsoft.com/l/meetup-join/mock-link"
+        try:
+            db = firestore.client()
+            booking_id = str(uuid.uuid4())
+            chosen_dt = datetime.fromisoformat(request.chosenStartTime.replace("Z", "+00:00"))
+            booking_data = {
+                "id": booking_id,
+                "staffEmail": request.staffEmail,
+                "borrowerId": user.uid,
+                "borrowerEmail": borrower_email,
+                "eventId": mock_event_id,
+                "joinUrl": mock_join_url,
+                "startTime": request.chosenStartTime,
+                "endTime": (chosen_dt + timedelta(minutes=request.durationMinutes)).isoformat(),
+                "status": "confirmed",
+                "createdAt": datetime.utcnow(),
+                "mode": "mock"
+            }
+            db.collection("bookings").document(booking_id).set(booking_data)
+        except Exception:
+            # No-op in mock mode
+            ...
+        return {"eventId": mock_event_id, "joinUrl": mock_join_url}
+
+    if graph_breaker.state == "open" and not graph_breaker.allow_request():
+        raise HTTPException(status_code=503, detail="Graph temporarily unavailable (breaker open).")
+
     service = GraphService()
     
     # 1. Validate availability (Simplified: we trust the client's chosen time but could double check)
@@ -135,13 +193,16 @@ async def book_meeting(request: BookingRequest):
     event_result = await service.create_calendar_event(
         organizer_email=request.staffEmail,
         subject="Consultation Call",
-        attendees=[request.borrowerEmail],
+        attendees=[borrower_email],
         start_time=request.chosenStartTime,
         end_time=chosen_end_dt.isoformat()
     )
     
     if not event_result:
+        graph_breaker.record_failure("create_calendar_event_failed")
         raise HTTPException(status_code=502, detail="Failed to create calendar event with provider.")
+    else:
+        graph_breaker.record_success()
 
     # 3. Persist to Firestore
     try:
@@ -150,7 +211,8 @@ async def book_meeting(request: BookingRequest):
         booking_data = {
             "id": booking_id,
             "staffEmail": request.staffEmail,
-            "borrowerEmail": request.borrowerEmail,
+            "borrowerId": user.uid,
+            "borrowerEmail": borrower_email,
             "eventId": event_result["eventId"],
             "joinUrl": event_result["joinUrl"],
             "startTime": request.chosenStartTime,
