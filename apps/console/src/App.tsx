@@ -11,6 +11,7 @@ import PaymentsPage from './pages/PaymentsPage';
 import TeamsIntegrationPage from './pages/TeamsIntegrationPage';
 import WebsiteLeadsPage from './pages/WebsiteLeadsPage';
 import MarketplaceConfigPage from './pages/MarketplaceConfigPage';
+import CommunityManagementPage from './pages/CommunityManagementPage';
 import OpsConsolePage from './pages/OpsConsolePage';
 import DashboardLayout from './layouts/DashboardLayout';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
@@ -65,6 +66,7 @@ export default function App() {
           <Route path="teams" element={<TeamsIntegrationPage />} />
           <Route path="leads" element={<WebsiteLeadsPage />} />
           <Route path="marketplace" element={<MarketplaceConfigPage />} />
+          <Route path="community" element={<CommunityManagementPage />} />
           <Route path="ops" element={<OpsConsolePage />} />
           <Route path="admin" element={<AdminPage />} />
         </Route>

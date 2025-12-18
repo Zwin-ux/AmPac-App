@@ -19,10 +19,13 @@ import {
     updateDoc, 
     deleteDoc, 
     query, 
-    orderBy 
+    orderBy,
+    getDocs,
+    limit
 } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { LOCATIONS, type LocationId } from '../data/locations';
 
 export interface MarketplaceItem {
     id: string;
@@ -34,9 +37,10 @@ export interface MarketplaceItem {
     priceLabel?: string;
     featured?: boolean;
     sortOrder?: number;
+    locationId?: LocationId | 'global';
 }
 
-const CATEGORIES = ['Tools', 'Credit', 'Consulting', 'Legal', 'Marketing', 'Other'];
+const CATEGORIES = ['Tools', 'Credit', 'Consulting', 'Legal', 'Marketing', 'Resources', 'Events', 'Other'];
 
 export default function MarketplaceConfigPage() {
     const navigate = useNavigate();
@@ -47,6 +51,7 @@ export default function MarketplaceConfigPage() {
     const [editingItem, setEditingItem] = useState<Partial<MarketplaceItem> | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
+    const [filterLocation, setFilterLocation] = useState<LocationId | 'all'>('all');
 
     useEffect(() => {
         const params = new URLSearchParams(location.search);
@@ -59,10 +64,11 @@ export default function MarketplaceConfigPage() {
                 title: seedTitle || '',
                 priceLabel: seedPrice || '',
                 category: seedCategory || 'Sale',
-                description: 'Imported from Optix Sales system.',
+                description: 'Imported from Internal Sales system.',
                 sortOrder: 0,
                 featured: true,
-                url: 'https://'
+                url: 'https://',
+                locationId: 'global'
             });
             // Clear URL params without reload
             navigate(location.pathname, { replace: true });
@@ -91,7 +97,8 @@ export default function MarketplaceConfigPage() {
                 ...editingItem,
                 sortOrder: editingItem.sortOrder || 0,
                 featured: editingItem.featured || false,
-                category: editingItem.category || 'Other'
+                category: editingItem.category || 'Other',
+                locationId: editingItem.locationId || 'global'
             };
 
             if (editingItem.id) {
@@ -121,10 +128,12 @@ export default function MarketplaceConfigPage() {
         }
     };
 
-    const filteredItems = items.filter(i => 
-        i.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        i.category.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredItems = items.filter(i => {
+        const matchesSearch = i.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                             i.category.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesLocation = filterLocation === 'all' || i.locationId === filterLocation || i.locationId === 'global';
+        return matchesSearch && matchesLocation;
+    });
 
     return (
         <div className="p-8">
@@ -143,33 +152,33 @@ export default function MarketplaceConfigPage() {
                     </h1>
                     <p className="text-textSecondary mt-1">Manage partner tools and resources for the mobile app</p>
                 </div>
-                <button
-                    onClick={() => setEditingItem({ category: 'Tools', sortOrder: 0, featured: false })}
-                    className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primaryLight transition-colors shadow-sm"
-                >
-                    <Plus className="w-5 h-5" />
-                    Add New Item
-                </button>
                 <div className="flex gap-2">
                     <button
                         onClick={async () => {
                             setIsSyncing(true);
                             try {
-                                // Real logic: Pull latest "Sales" from Firestore payments
                                 const paymentsRef = collection(db, 'payments');
-                                const qSync = query(paymentsRef, orderBy('createdAt', 'desc'));
-                                console.log('Syncing with query:', qSync);
+                                const qSync = query(paymentsRef, orderBy('createdAt', 'desc'), limit(1));
+                                const snap = await getDocs(qSync);
                                 
-                                // In a real app we'd fetch once, but for demo we show the intent
-                                setEditingItem({
-                                    title: 'Last Customer Transaction',
-                                    description: 'Recently funded deal or membership plan to be featured.',
-                                    category: 'Tools',
-                                    priceLabel: 'Inquire for price',
-                                    badge: 'SALE',
-                                    url: 'https://ampac.com/deals',
-                                    featured: true
-                                });
+                                if (!snap.empty) {
+                                    const latest = snap.docs[0].data() as { customerName?: string; currency?: string; amount?: number | string };
+                                    setEditingItem({
+                                        title: `Service: ${latest.customerName || 'New Deal'}`,
+                                        description: `Recently funded ${latest.currency || '$'}${latest.amount || '0'} transaction.`,
+                                        category: 'Tools',
+                                        priceLabel: `${latest.currency || '$'}${latest.amount || '0'}`,
+                                        badge: 'NEW SALE',
+                                        url: 'https://ampac.com/deals',
+                                        featured: true,
+                                        sortOrder: 0
+                                    });
+                                } else {
+                                    alert('No recent sales found in Internal Admin system.');
+                                }
+                            } catch (err) {
+                                console.error('Sync error:', err);
+                                alert('Failed to sync with internal sales.');
                             } finally {
                                 setIsSyncing(false);
                             }
@@ -178,10 +187,10 @@ export default function MarketplaceConfigPage() {
                         className="flex items-center gap-2 px-4 py-2 bg-surfaceHighlight border border-border text-primary rounded-lg hover:bg-surface transition-colors shadow-sm disabled:opacity-50"
                     >
                         <ShoppingBag className={`w-4 h-4 ${isSyncing ? 'animate-bounce' : ''}`} />
-                        {isSyncing ? 'Syncing...' : 'Sync Optix Sale'}
+                        {isSyncing ? 'Syncing...' : 'Import Internal Sale'}
                     </button>
                     <button
-                        onClick={() => setEditingItem({ category: 'Tools', sortOrder: 0, featured: false })}
+                        onClick={() => setEditingItem({ category: 'Tools', sortOrder: 0, featured: false, locationId: 'global' })}
                         className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primaryLight transition-colors shadow-sm"
                     >
                         <Plus className="w-5 h-5" />
@@ -192,15 +201,25 @@ export default function MarketplaceConfigPage() {
 
             <div className="bg-surface rounded-xl border border-border shadow-subtle overflow-hidden">
                 <div className="px-6 py-4 border-b border-border bg-surfaceHighlight flex items-center justify-between gap-4">
-                    <div className="relative flex-1 max-w-md">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-textSecondary" />
-                        <input
-                            type="text"
-                            placeholder="Search marketplace items..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10 pr-4 py-2 bg-surface border border-border rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-primary"
-                        />
+                    <div className="flex gap-4 items-center">
+                        <div className="relative flex-1 max-w-md">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-textSecondary" />
+                            <input
+                                type="text"
+                                placeholder="Search marketplace items..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-10 pr-4 py-2 bg-surface border border-border rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-primary"
+                            />
+                        </div>
+                        <select
+                            value={filterLocation}
+                            onChange={(e) => setFilterLocation(e.target.value as LocationId | 'all')}
+                            className="px-3 py-2 bg-surface border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                        >
+                            <option value="all">All Locations</option>
+                            {LOCATIONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                        </select>
                     </div>
                 </div>
 
@@ -218,6 +237,7 @@ export default function MarketplaceConfigPage() {
                                     <th className="px-6 py-4 font-semibold text-textSecondary uppercase tracking-wider">Category</th>
                                     <th className="px-6 py-4 font-semibold text-textSecondary uppercase tracking-wider">Badge / Pricing</th>
                                     <th className="px-6 py-4 font-semibold text-textSecondary uppercase tracking-wider text-center">Featured</th>
+                                    <th className="px-6 py-4 font-semibold text-textSecondary uppercase tracking-wider">Location</th>
                                     <th className="px-6 py-4 font-semibold text-textSecondary uppercase tracking-wider text-right">Actions</th>
                                 </tr>
                             </thead>
@@ -259,14 +279,21 @@ export default function MarketplaceConfigPage() {
                                                     )}
                                                 </div>
                                             </td>
+                                            <td className="px-6 py-4 text-center">
+                                                {item.featured ? (
+                                                    <Star className="w-5 h-5 text-amber-400 fill-amber-400 mx-auto" />
+                                                ) : (
+                                                    <Star className="w-5 h-5 text-border mx-auto" />
+                                                )}
+                                            </td>
                                             <td className="px-6 py-4">
-                                                <div className="flex justify-center">
-                                                    {item.featured ? (
-                                                        <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
-                                                    ) : (
-                                                        <Star className="w-5 h-5 text-border" />
-                                                    )}
-                                                </div>
+                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                                                    item.locationId === 'global' || !item.locationId
+                                                    ? 'bg-blue-50 text-blue-700 border-blue-100' 
+                                                    : 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                                                }`}>
+                                                    {LOCATIONS.find(l => l.id === item.locationId)?.name || 'Global'}
+                                                </span>
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -357,6 +384,17 @@ export default function MarketplaceConfigPage() {
                                         onChange={(e) => setEditingItem({...editingItem, sortOrder: parseInt(e.target.value) || 0})}
                                         className="w-full px-4 py-3 bg-surface border-2 border-border rounded-xl focus:outline-none focus:border-primary focus:ring-0 transition-colors"
                                     />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-bold text-textSecondary mb-2 uppercase tracking-wide">Location</label>
+                                    <select
+                                        value={editingItem.locationId || 'global'}
+                                        onChange={(e) => setEditingItem({...editingItem, locationId: e.target.value as LocationId | 'global'})}
+                                        className="w-full px-4 py-3 bg-surface border-2 border-border rounded-xl focus:outline-none focus:border-primary focus:ring-0 transition-colors"
+                                    >
+                                        {LOCATIONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                                    </select>
                                 </div>
 
                                 <div className="col-span-2">

@@ -225,6 +225,48 @@ export interface Business {
     ownerName?: string;
 }
 
+export interface Event {
+    id: string;
+    title: string;
+    description: string;
+    date: string; // ISO string
+    location: string;
+    organizerId: string;
+    organizerName: string;
+    attendees: string[]; // User IDs
+}
+
+export interface MarketplaceItem {
+    id: string;
+    title: string;
+    description: string;
+    category: string;
+    url: string;
+    badge?: string;
+    priceLabel?: string;
+    featured?: boolean;
+    sortOrder?: number;
+    locationId?: string;
+}
+
+export interface FeedPost {
+    id: string;
+    authorId: string;
+    authorName: string;
+    authorAvatar?: string;
+    orgId?: string;
+
+    content: string;
+    mediaUrls?: string[];
+
+    likes: string[]; // Array of UIDs
+    commentCount: number;
+
+    type: 'announcement' | 'showcase' | 'qa';
+
+    createdAt: Timestamp;
+}
+
 // --- Ventures Integration Types ---
 
 export type SyncMode = 'dry_run' | 'validate' | 'commit';

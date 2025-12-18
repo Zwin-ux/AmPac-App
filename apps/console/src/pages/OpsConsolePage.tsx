@@ -15,6 +15,7 @@ import {
     AlertTriangle,
     CheckCircle2,
     Clock,
+    Megaphone,
 } from 'lucide-react';
 import { API_URL } from '../config';
 import { fetchFlags, fetchOpsOverview, updateFlag, type FeatureFlag, type OpsOverview } from '../services/opsService';
@@ -72,6 +73,12 @@ const MODULES = [
         icon: Link2,
         path: '/marketplace',
         desc: 'Curated links/cards for the “More” screen; reorder per site.',
+    },
+    {
+        title: 'Community Feed',
+        icon: Megaphone,
+        path: '/community',
+        desc: 'Moderate user posts and create official announcements.',
     },
 ] as const;
 
