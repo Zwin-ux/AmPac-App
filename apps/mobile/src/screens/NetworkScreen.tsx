@@ -3,10 +3,10 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, 
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../theme';
-import { Business, Event } from '../types';
+import { Business, Event, FeedPost } from '../types';
 import { getBusinesses } from '../services/network';
 import { getEvents, createEvent } from '../services/events';
-import { feedService, FeedItem } from '../services/feedService';
+import { feedService } from '../services/feedService';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AMPAC_STAFF, StaffMember } from '../data/staff';
@@ -30,7 +30,7 @@ export default function NetworkScreen() {
     const [creatingEvent, setCreatingEvent] = useState(false);
 
     // Feed State
-    const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
+    const [feedItems, setFeedItems] = useState<FeedPost[]>([]);
     const [loadingFeed, setLoadingFeed] = useState(false);
 
     // Shared State
@@ -125,7 +125,7 @@ export default function NetworkScreen() {
 
     const filteredFeed = feedItems.filter(item =>
         item.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.authorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.type.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
@@ -193,24 +193,23 @@ export default function NetworkScreen() {
         </View>
     );
 
-    const getPostTypeIcon = (type: FeedItem['type']) => {
+    const getPostTypeIcon = (type: FeedPost['type']) => {
         const icons = {
-            post: { name: 'document-text', color: '#64748B' },
-            payment: { name: 'card', color: '#10B981' },
-            application: { name: 'checkmark-circle', color: '#3B82F6' },
-            website: { name: 'globe', color: '#8B5CF6' }
+            announcement: { name: 'megaphone-outline', color: '#64748B' },
+            showcase: { name: 'image-outline', color: '#8B5CF6' },
+            qa: { name: 'help-circle-outline', color: '#3B82F6' }
         };
-        return icons[type] || { name: 'document-text', color: '#64748B' };
+        return icons[type] || { name: 'megaphone-outline', color: '#64748B' };
     };
 
-    const renderFeedItem = ({ item }: { item: FeedItem }) => (
+    const renderFeedItem = ({ item }: { item: FeedPost }) => (
         <View style={styles.card}>
             <View style={[styles.avatarPlaceholder, { backgroundColor: theme.colors.secondary }]}>
-                <Text style={styles.avatarText}>{item.userName.charAt(0)}</Text>
+                <Text style={styles.avatarText}>{item.authorName.charAt(0)}</Text>
             </View>
             <View style={styles.cardContent}>
                 <View style={styles.feedHeader}>
-                    <Text style={styles.businessName}>{item.userName}</Text>
+                    <Text style={styles.businessName}>{item.authorName}</Text>
                     <View style={styles.feedMeta}>
                         <Ionicons
                             name={getPostTypeIcon(item.type).name as any}
@@ -225,11 +224,11 @@ export default function NetworkScreen() {
                 <View style={styles.feedFooter}>
                     <View style={styles.feedStat}>
                         <Ionicons name="heart-outline" size={14} color={theme.colors.textSecondary} />
-                        <Text style={styles.feedStatText}>{item.likes}</Text>
+                        <Text style={styles.feedStatText}>{item.likes?.length || 0}</Text>
                     </View>
                     <View style={styles.feedStat}>
                         <Ionicons name="chatbubble-outline" size={14} color={theme.colors.textSecondary} />
-                        <Text style={styles.feedStatText}>{item.comments}</Text>
+                        <Text style={styles.feedStatText}>{item.commentCount || 0}</Text>
                     </View>
                 </View>
             </View>

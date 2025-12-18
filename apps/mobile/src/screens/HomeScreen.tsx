@@ -63,7 +63,7 @@ export default function HomeScreen() {
         { label: 'Support & Concierge', icon: 'chatbox-ellipses', color: '#1565C0', background: '#E3F2FD', screen: 'Support' },
         { label: 'Book Space', icon: 'calendar', color: '#2E7D32', background: '#E8F5E9', screen: 'Spaces' },
         { label: 'Payments', icon: 'card', color: '#1565C0', background: '#E3F2FD', screen: 'Payment' },
-        { label: 'Web Builder', icon: 'globe-outline', color: '#EF6C00', background: '#FFF3E0', screen: 'WebsiteBuilder' },
+        { label: 'Marketplace', icon: 'bag-handle', color: '#1F2937', background: '#F3F4F6', screen: 'Marketplace' },
         { label: 'Network', icon: 'people', color: '#7B1FA2', background: '#F3E5F5', screen: 'Network' },
     ];
 

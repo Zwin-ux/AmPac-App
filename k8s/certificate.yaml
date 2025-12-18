@@ -1,8 +1,0 @@
-apiVersion: networking.gke.io/v1
-kind: ManagedCertificate
-metadata:
-  name: ampac-cert
-  namespace: default
-spec:
-  domains:
-    - ampac.business

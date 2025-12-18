@@ -175,7 +175,7 @@ export default function SocialHubScreen() {
     );
 
     const renderNetworkContent = () => {
-        let data = [];
+        let data: any[] = [];
         // Simple merge for 'all' or filter
         if (networkFilter === 'all' || networkFilter === 'staff') {
             data.push(...staff.map(s => ({ ...s, _type: 'staff' })));
@@ -189,9 +189,10 @@ export default function SocialHubScreen() {
 
         // Filter by search
         if (searchQuery) {
-            data = data.filter(d => 
-                (d.name || d.title || '').toLowerCase().includes(searchQuery.toLowerCase())
-            );
+            data = data.filter((d: any) => {
+                const label = d?._type === 'event' ? d.title : d.name;
+                return String(label || '').toLowerCase().includes(searchQuery.toLowerCase());
+            });
         }
 
         return (

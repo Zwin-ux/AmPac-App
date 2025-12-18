@@ -9,6 +9,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const { width, height } = Dimensions.get('window');
 
 export default function LandingScreen({ navigation }: any) {
+    const shouldResetOnLanding = process.env.EXPO_PUBLIC_DEMO_RESET_ON_LANDING === 'true';
+
     // Animation Values
     const logoOpacity = useRef(new Animated.Value(0)).current;
     const logoScale = useRef(new Animated.Value(0.8)).current;
@@ -19,17 +21,19 @@ export default function LandingScreen({ navigation }: any) {
     const buttonsOpacity = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
-        // Force sign out and clear cache on landing to ensure clean state for demos
-        const clearState = async () => {
-            try {
-                await signOut(auth);
-                await AsyncStorage.clear();
-                console.log('State cleared for fresh test');
-            } catch (e) {
-                console.log('Cleanup error', e);
-            }
-        };
-        clearState();
+        // Optional: demo-only reset to ensure clean state between test runs.
+        if (shouldResetOnLanding) {
+            const clearState = async () => {
+                try {
+                    await signOut(auth);
+                    await AsyncStorage.clear();
+                    console.log('State cleared for fresh test');
+                } catch (e) {
+                    console.log('Cleanup error', e);
+                }
+            };
+            clearState();
+        }
 
         // Sequence of animations
         Animated.sequence([

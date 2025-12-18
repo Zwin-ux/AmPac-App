@@ -82,6 +82,16 @@ export interface User {
     cardColor?: string;
     businessStatus?: 'idea' | 'startup' | 'scaling' | 'established' | 'enterprise';
     businessType?: 'technology' | 'retail' | 'service' | 'manufacturing' | 'health' | 'finance' | 'other';
+
+    // Optional demographics (self-reported)
+    demographics?: {
+        raceEthnicity?: string[];
+        gender?: string;
+        veteranStatus?: 'yes' | 'no' | 'prefer_not';
+    };
+
+    // Optional skills/services tags
+    skills?: string[];
 }
 
 export interface LoanProduct {
@@ -359,6 +369,18 @@ export interface Event {
     organizerId: string;
     organizerName: string;
     attendees: string[]; // User IDs
+}
+
+export interface MarketplaceItem {
+    id: string;
+    title: string;
+    description: string;
+    category: string;
+    url: string;
+    badge?: string;
+    priceLabel?: string;
+    featured?: boolean;
+    sortOrder?: number;
 }
 
 // --- Chat & Social ---

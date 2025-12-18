@@ -6,6 +6,9 @@ node_modules/
 # Expo
 .expo/
 dist/
+dist-web/
+dist-ios/
+dist-android/
 web-build/
 expo-env.d.ts
 
@@ -39,3 +42,8 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Playwright
+test-results/
+playwright-report/
+test_output*.txt

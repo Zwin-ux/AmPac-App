@@ -234,7 +234,7 @@ export default function ApplicationScreen() {
                         <Button 
                             title="Go to Web Portal" 
                             onPress={handleOpenPortal} 
-                            variant="outline"
+                            variant="secondary"
                             style={{ marginTop: 15 }}
                         />
                     </Card>
@@ -289,8 +289,6 @@ const styles = StyleSheet.create({
         width: '100%',
         backgroundColor: theme.colors.surface,
         borderRadius: theme.borderRadius.lg,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
         padding: theme.spacing.md,
         marginBottom: theme.spacing.lg,
         ...theme.shadows.card,

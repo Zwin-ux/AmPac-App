@@ -148,6 +148,47 @@ export default function ProfileScreen({ navigation }: any) {
                     </Text>
                 </Card>
 
+                <Text style={styles.sectionLabel}>PROFILE_DETAILS</Text>
+                <Card style={styles.infoCard} variant="flat">
+                    <TouchableOpacity
+                        style={styles.navRow}
+                        onPress={() => navigation.navigate('Demographics')}
+                        activeOpacity={0.85}
+                    >
+                        <View style={styles.navIcon}>
+                            <Ionicons name="id-card-outline" size={18} color={theme.colors.text} />
+                        </View>
+                        <View style={styles.navText}>
+                            <Text style={styles.navTitle}>Demographics (optional)</Text>
+                            <Text style={styles.navValue} numberOfLines={2}>
+                                {user?.demographics?.raceEthnicity?.length
+                                    ? user.demographics.raceEthnicity.join(', ')
+                                    : 'Not provided'}
+                            </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+                    </TouchableOpacity>
+
+                    <View style={styles.divider} />
+
+                    <TouchableOpacity
+                        style={styles.navRow}
+                        onPress={() => navigation.navigate('Skills')}
+                        activeOpacity={0.85}
+                    >
+                        <View style={styles.navIcon}>
+                            <Ionicons name="sparkles-outline" size={18} color={theme.colors.text} />
+                        </View>
+                        <View style={styles.navText}>
+                            <Text style={styles.navTitle}>Skills & Services</Text>
+                            <Text style={styles.navValue}>
+                                {user?.skills?.length ? `${user.skills.length} selected` : 'Add your skills'}
+                            </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+                    </TouchableOpacity>
+                </Card>
+
                 <Text style={styles.sectionLabel}>SYSTEM</Text>
                 <Card style={styles.infoCard} variant="flat">
                     <View style={[styles.infoRow, { justifyContent: 'space-between', alignItems: 'center' }]}>
@@ -297,6 +338,41 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: theme.colors.text,
         lineHeight: 20,
+    },
+    navRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: theme.spacing.md,
+        paddingVertical: theme.spacing.sm,
+    },
+    navIcon: {
+        width: 36,
+        height: 36,
+        borderRadius: theme.borderRadius.md,
+        backgroundColor: theme.colors.surface,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    navText: {
+        flex: 1,
+    },
+    navTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: theme.colors.text,
+        marginBottom: 2,
+    },
+    navValue: {
+        fontSize: 13,
+        color: theme.colors.textSecondary,
+        lineHeight: 18,
+    },
+    divider: {
+        height: 1,
+        backgroundColor: theme.colors.border,
+        marginVertical: theme.spacing.sm,
     },
     toggle: {
         width: 40,

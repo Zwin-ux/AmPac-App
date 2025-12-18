@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Users, Search, Plus, MoreVertical } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { collection, onSnapshot, doc, updateDoc, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 
@@ -17,6 +18,7 @@ export interface Payment {
 }
 
 export default function PaymentsPage() {
+    const navigate = useNavigate();
     const [payments, setPayments] = useState<Payment[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -119,7 +121,7 @@ export default function PaymentsPage() {
                         </div>
                         <select
                             value={filterStatus}
-                            onChange={(e) => setFilterStatus(e.target.value as any)}
+                            onChange={(e) => setFilterStatus(e.target.value as Payment['status'] | 'all')}
                             className="px-3 py-2 bg-surface border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         >
                             <option value="all">All Statuses</option>
@@ -197,6 +199,22 @@ export default function PaymentsPage() {
                                                             className="px-3 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium"
                                                         >
                                                             Refund
+                                                        </button>
+                                                    )}
+                                                    {payment.status === 'paid' && (
+                                                        <button
+                                                            onClick={() => {
+                                                                // Navigate to marketplace config with seed data
+                                                                const searchParams = new URLSearchParams();
+                                                                searchParams.set('seed_title', `Promotion: ${payment.customerName} Special`);
+                                                                searchParams.set('seed_price', `${payment.currency} ${payment.amount}`);
+                                                                searchParams.set('seed_category', 'Sale');
+                                                                navigate(`/marketplace?${searchParams.toString()}`);
+                                                            }}
+                                                            className="px-3 py-1 bg-amber-100 text-amber-800 rounded text-xs font-medium hover:bg-amber-200"
+                                                            title="Promote this sale type to Marketplace"
+                                                        >
+                                                            Promote
                                                         </button>
                                                     )}
                                                     <button className="p-1 text-textSecondary hover:text-primary">

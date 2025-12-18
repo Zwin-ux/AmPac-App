@@ -4,7 +4,7 @@ from app.core.config import get_settings
 import asyncio
 from app.services.sync_service import SyncService
 from fastapi.staticfiles import StaticFiles
-from app.api.routers import chat, website, documents, agents, knowledge, ventures, calendar, assistant, health, support
+from app.api.routers import chat, documents, agents, knowledge, ventures, calendar, assistant, health, support
 from app.core.logging_config import init_logging
 from app.core.middleware import RequestContextMiddleware
 
@@ -55,7 +55,6 @@ async def health_check():
     return {"status": "healthy"}
 
 app.include_router(chat.router, prefix=f"{settings.API_V1_STR}/chat", tags=["chat"])
-app.include_router(website.router, prefix=f"{settings.API_V1_STR}/website", tags=["website"])
 app.include_router(documents.router, prefix=f"{settings.API_V1_STR}/documents", tags=["documents"])
 app.include_router(agents.router, prefix=f"{settings.API_V1_STR}/agents", tags=["agents"])
 app.include_router(knowledge.router, prefix=f"{settings.API_V1_STR}/knowledge", tags=["knowledge"])

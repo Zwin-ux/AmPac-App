@@ -17,8 +17,6 @@ If you only need a “shareable” demo quickly (no app stores), use `apps/mobil
 - App Store Connect (create the app listing): https://appstoreconnect.apple.com/
 - Google Play Console: https://play.google.com/console/
 - Firebase Console: https://console.firebase.google.com/
-- GKE managed certificates: https://cloud.google.com/kubernetes-engine/docs/how-to/managed-certs
-- Cloud Run custom domains (alternative to GKE ingress): https://cloud.google.com/run/docs/mapping-custom-domains
 
 ---
 
@@ -53,21 +51,14 @@ If you only need a “shareable” demo quickly (no app stores), use `apps/mobil
 
 Reference: `apps/brain/DEPLOYMENT.md`.
 
-#### Getting a real HTTPS domain (GKE path in this repo)
-You already have GKE manifests in `k8s/ingress.yaml` and `k8s/certificate.yaml` that expect `ampac.business`.
-
+#### Getting a real HTTPS domain (provider-agnostic)
 Do this once:
-1. Get your GKE ingress IP:
-   - `kubectl get ingress ampac-ingress -o wide`
-2. Make the IP **stable** (recommended):
-   - Reserve a **global** static IP in GCP, then annotate the ingress with it (`kubernetes.io/ingress.global-static-ip-name`).
-3. Set DNS:
-   - In your domain registrar/DNS provider, create an **A record** for `ampac.business` pointing to the ingress IP.
-4. Wait for TLS:
-   - GKE managed cert provisioning can take ~15–60 minutes after DNS is correct.
-   - Check status: `kubectl describe managedcertificate ampac-cert`
-5. Confirm your final mobile API URL works:
-   - `https://ampac.business/api/v1/health` (or `/api/v1/health/deps`, `/sync`, `/calendar`)
+1. Pick the production domain: `https://api.<your-domain>/api/v1`
+2. Configure DNS for that domain to point at your backend (A/AAAA/CNAME depending on provider)
+3. Enable TLS (managed cert is fine) and confirm:
+   - `https://api.<your-domain>/health`
+   - `https://api.<your-domain>/api/v1/health`
+4. Set `EXPO_PUBLIC_API_URL` to `https://api.<your-domain>/api/v1` in the EAS build environment for production
 
 ### 1.2 Firebase readiness (prod)
 - **Auth**: confirm providers enabled (email/phone/etc) and test sign-in from a real device.
@@ -120,7 +111,6 @@ You need two sets of configuration:
 
 ## 2.4 Decide what ships in v1 (so config/auth matches reality)
 You need a clear yes/no for each, because it affects auth + store review risk:
-- Website builder: **Yes/No**
 - Stripe payments: **Yes/No**
 - Teams notifications: **Yes/No** (strong recommendation: keep this server-side; do not ship a Teams webhook URL in the mobile client)
 
@@ -181,6 +171,22 @@ You can set vars via EAS dashboards or CLI (method varies by EAS version). The g
 
 ## 5) Build & Distribute
 
+### 5.0 Local quality gates (run before EAS builds)
+From `apps/mobile`:
+```bash
+npm install
+npm run typecheck
+npm run export:ios
+npm run export:android
+npm run test:e2e
+```
+This is the fastest way to catch “will the app actually build” failures before you burn time on EAS.
+
+What it covers:
+- TypeScript compile (hard fail on missing/incorrect types)
+- Expo bundling for iOS + Android (catches missing native modules/import paths)
+- Web smoke tests via Playwright (landing/auth/demo navigation + Apply pre-check)
+
 ### 5.1 Staging/Beta builds (first)
 **Android (Internal distribution):**
 ```bash
@@ -199,6 +205,16 @@ Smoke test on real devices:
 - Document upload (if shipped)
 - Calendar slots + booking (if shipped)
 - Payments flow (if shipped)
+
+#### Device QA checklist (iOS + Android)
+Run this on at least 1 real iPhone + 1 real Android before any “Production” build:
+- Auth: sign up, sign in, sign out, session restore after app restart
+- Core tabs: Home/Apply/Spaces/Social/Support all render without crashing
+- Spaces: rooms list loads; booking UI loads; back navigation works
+- Apply: pre-check can reach Eligible and open external portal link
+- Support: form validates + submits (and you see a success toast/alert)
+- Offline: turn on airplane mode and confirm offline messaging is sane (no infinite spinners)
+- Performance: cold start feels acceptable; no obvious UI jank scrolling Home/Social
 
 ### 5.2 Production builds
 ```bash

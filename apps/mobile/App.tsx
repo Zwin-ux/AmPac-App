@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 // Screens
 import SignInScreen from './src/screens/SignInScreen';
 import SignUpScreen from './src/screens/SignUpScreen';
+import OpenSplashScreen from './src/screens/OpenSplashScreen';
 import LandingScreen from './src/screens/LandingScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import HotlineScreen from './src/screens/HotlineScreen';
@@ -19,11 +20,13 @@ import MultiRoomBookingScreen from './src/screens/MultiRoomBookingScreen';
 import EditProfileScreen from './src/screens/EditProfileScreen';
 import InviteFriendsScreen from './src/screens/InviteFriendsScreen';
 import BusinessProfileScreen from './src/screens/BusinessProfileScreen';
-import WebsiteBuilderScreen from './src/screens/WebsiteBuilderScreen';
 import PaymentScreen from './src/screens/PaymentScreen';
 import FeedScreen from './src/screens/FeedScreen';
 import ChatListScreen from './src/screens/ChatListScreen';
 import ChatScreenWrapper from './src/screens/ChatScreenWrapper';
+import DemographicsScreen from './src/screens/DemographicsScreen';
+import SkillsScreen from './src/screens/SkillsScreen';
+import MarketplaceScreen from './src/screens/MarketplaceScreen';
 
 // Types
 import { theme } from './src/theme';
@@ -133,8 +136,10 @@ function AppStack() {
           <Stack.Screen name="MultiRoomBooking" component={MultiRoomBookingScreen} />
           <Stack.Screen name="Application" component={ApplicationScreen} />
           <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+          <Stack.Screen name="Demographics" component={DemographicsScreen} />
+          <Stack.Screen name="Skills" component={SkillsScreen} />
           <Stack.Screen name="InviteFriends" component={InviteFriendsScreen} />
-          <Stack.Screen name="WebsiteBuilder" component={WebsiteBuilderScreen} />
+          <Stack.Screen name="Marketplace" component={MarketplaceScreen} />
           <Stack.Screen name="Payment" component={PaymentScreen} />
           <Stack.Screen name="Feed" component={FeedScreen} />
           <Stack.Screen name="Network" component={NetworkScreen} />
@@ -143,6 +148,7 @@ function AppStack() {
         </>
       ) : (
         <>
+          <Stack.Screen name="OpenSplash" component={OpenSplashScreen} />
           <Stack.Screen name="Landing" component={LandingScreen} />
           <Stack.Screen name="SignIn" component={SignInScreen} />
           <Stack.Screen name="SignUp" component={SignUpScreen} />

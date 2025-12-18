@@ -1,31 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Alert, StyleSheet, SafeAreaView, ScrollView, TextInput, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { feedService, FeedItem } from '../services/feedService';
+import { feedService } from '../services/feedService';
 import { auth } from '../../firebaseConfig';
+import type { FeedPost } from '../types';
 
 const primaryBlue = "#0064A6";
 
 export default function FeedScreen({ navigation }: any) {
     const [loading, setLoading] = useState(true);
-    const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
+    const [feedItems, setFeedItems] = useState<FeedPost[]>([]);
     const [newPostContent, setNewPostContent] = useState('');
     const [creatingPost, setCreatingPost] = useState(false);
 
     useEffect(() => {
-        const loadFeed = async () => {
-            try {
-                const feed = await feedService.getFeed();
-                setFeedItems(feed);
-            } catch (error) {
-                console.error('Error loading feed:', error);
-                Alert.alert("Error", "Failed to load feed.");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadFeed();
+        const unsubscribe = feedService.subscribeToFeed(50, (posts) => {
+            setFeedItems(posts);
+            setLoading(false);
+        });
+        return () => unsubscribe();
     }, []);
 
     const handleCreatePost = async () => {
@@ -36,8 +29,7 @@ export default function FeedScreen({ navigation }: any) {
 
         try {
             setCreatingPost(true);
-            const newPost = await feedService.createPost(newPostContent, 'post');
-            setFeedItems([newPost, ...feedItems]);
+            await feedService.createPost(newPostContent, 'announcement');
             setNewPostContent('');
         } catch (error) {
             console.error('Error creating post:', error);
@@ -49,24 +41,32 @@ export default function FeedScreen({ navigation }: any) {
 
     const handleLikePost = async (postId: string) => {
         try {
-            await feedService.likePost(postId);
-            // Update local state
-            setFeedItems(feedItems.map(item => 
-                item.id === postId ? { ...item, likes: item.likes + 1 } : item
-            ));
+            const uid = auth.currentUser?.uid;
+            if (!uid) {
+                Alert.alert("Sign in required", "Please sign in to like posts.");
+                return;
+            }
+            await feedService.toggleLike(postId);
+            setFeedItems((prev) =>
+                prev.map((item) => {
+                    if (item.id !== postId) return item;
+                    const liked = item.likes?.includes(uid);
+                    const nextLikes = liked ? item.likes.filter((x) => x !== uid) : [...(item.likes || []), uid];
+                    return { ...item, likes: nextLikes };
+                })
+            );
         } catch (error) {
             console.error('Error liking post:', error);
         }
     };
 
-    const getPostTypeIcon = (type: FeedItem['type']) => {
+    const getPostTypeIcon = (type: FeedPost['type']) => {
         const icons = {
-            post: { name: 'document-text', color: '#64748B' },
-            payment: { name: 'card', color: '#10B981' },
-            application: { name: 'checkmark-circle', color: '#3B82F6' },
-            website: { name: 'globe', color: '#8B5CF6' }
+            announcement: { name: 'megaphone-outline', color: '#64748B' },
+            showcase: { name: 'image-outline', color: '#8B5CF6' },
+            qa: { name: 'help-circle-outline', color: '#3B82F6' },
         };
-        return icons[type] || { name: 'document-text', color: '#64748B' };
+        return icons[type] || { name: 'megaphone-outline', color: '#64748B' };
     };
 
     const formatTimeAgo = (date: Date) => {
@@ -134,59 +134,40 @@ export default function FeedScreen({ navigation }: any) {
                             <View key={item.id} style={styles.feedItem}>
                                 <View style={styles.feedHeader}>
                                     <View style={styles.userInfo}>
-                                        {item.userAvatar ? (
-                                            <Image source={{ uri: item.userAvatar }} style={styles.userAvatar} />
+                                        {item.authorAvatar ? (
+                                            <Image source={{ uri: item.authorAvatar }} style={styles.userAvatar} />
                                         ) : (
                                             <View style={[styles.userAvatar, styles.center]}>
-                                                <Text style={styles.avatarText}>{item.userName.charAt(0)}</Text>
+                                                <Text style={styles.avatarText}>{(item.authorName || '?').charAt(0)}</Text>
                                             </View>
                                         )}
                                         <View style={styles.userDetails}>
-                                            <Text style={styles.userName}>{item.userName}</Text>
+                                            <Text style={styles.userName}>{item.authorName}</Text>
                                             <View style={styles.postMeta}>
                                                 <Ionicons 
-                                                    name={getPostTypeIcon(item.type).name} 
+                                                    name={getPostTypeIcon(item.type).name as any} 
                                                     size={14} 
                                                     color={getPostTypeIcon(item.type).color} 
                                                     style={{ marginRight: 4 }}
                                                 />
                                                 <Text style={styles.postType}>{item.type}</Text>
-                                                <Text style={styles.postTime}>• {formatTimeAgo(item.createdAt)}</Text>
+                                                <Text style={styles.postTime}>
+                                                    • {item.createdAt ? formatTimeAgo(item.createdAt.toDate()) : ''}
+                                                </Text>
                                             </View>
                                         </View>
                                     </View>
                                 </View>
                                 <Text style={styles.postContent}>{item.content}</Text>
                                 
-                                {/* Post Metadata */}
-                                {item.metadata && (
-                                    <View style={styles.postMetadata}>
-                                        {item.type === 'website' && item.metadata.websiteUrl && (
-                                            <TouchableOpacity onPress={() => Alert.alert("Website", `Visit: ${item.metadata.websiteUrl}`)}>
-                                                <Text style={styles.metadataLink}>{item.metadata.businessName} Website</Text>
-                                            </TouchableOpacity>
-                                        )}
-                                        {item.type === 'application' && item.metadata.status && (
-                                            <View style={styles.applicationStatus}>
-                                                <Text style={styles.statusText}>Status: {item.metadata.status}</Text>
-                                            </View>
-                                        )}
-                                        {item.type === 'payment' && item.metadata.amount && (
-                                            <View style={styles.paymentInfo}>
-                                                <Text style={styles.paymentText}>Amount: ${item.metadata.amount}</Text>
-                                            </View>
-                                        )}
-                                    </View>
-                                )}
-                                
                                 <View style={styles.postActions}>
                                     <TouchableOpacity style={styles.actionButton} onPress={() => handleLikePost(item.id)}>
                                         <Ionicons name="heart-outline" size={18} color="#64748B" />
-                                        <Text style={styles.actionText}>{item.likes}</Text>
+                                        <Text style={styles.actionText}>{item.likes?.length || 0}</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity style={styles.actionButton}>
                                         <Ionicons name="chatbubble-outline" size={18} color="#64748B" />
-                                        <Text style={styles.actionText}>{item.comments}</Text>
+                                        <Text style={styles.actionText}>{item.commentCount || 0}</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity style={styles.actionButton}>
                                         <Ionicons name="share-outline" size={18} color="#64748B" />

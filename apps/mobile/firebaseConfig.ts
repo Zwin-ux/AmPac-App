@@ -1,9 +1,10 @@
 import { initializeApp } from "firebase/app";
 import { getAnalytics, isSupported } from "firebase/analytics";
-import { getAuth, Auth } from "firebase/auth";
+import { getAuth, Auth, initializeAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
@@ -39,22 +40,31 @@ const app = initializeApp(firebaseConfig);
 let analytics;
 isSupported().then(yes => yes && (analytics = getAnalytics(app)));
 
-// Initialize Auth with Persistence
-// We use @react-native-async-storage/async-storage as recommended by the warning.
-// @ts-ignore
-import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
-
+// Initialize Auth with appropriate persistence per platform.
+// - Web: default web persistence (IndexedDB/localStorage)
+// - Native: AsyncStorage via firebase/auth/react-native
 let auth: Auth;
-try {
-    auth = initializeAuth(app, {
-        persistence: getReactNativePersistence(AsyncStorage)
-    });
-} catch (e: any) {
-    // If already initialized, use getAuth
-    if (e.code === 'auth/already-initialized') {
-        auth = getAuth(app);
-    } else {
-        throw e;
+if (Platform.OS === 'web') {
+    auth = getAuth(app);
+} else {
+    // firebase/auth's typings may omit this export, but it exists at runtime for React Native builds.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { getReactNativePersistence } = require('firebase/auth') as any;
+
+    try {
+        if (typeof getReactNativePersistence !== 'function') {
+            auth = getAuth(app);
+        } else {
+            auth = initializeAuth(app, {
+                persistence: getReactNativePersistence(AsyncStorage),
+            });
+        }
+    } catch (e: any) {
+        if (e?.code === 'auth/already-initialized') {
+            auth = getAuth(app);
+        } else {
+            throw e;
+        }
     }
 }
 

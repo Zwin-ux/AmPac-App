@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, SafeAreaView, ScrollView } from 'react-native';
 import { calendarService, TimeSlot, AvailabilityPayload } from '../services/calendarService';
 import { theme } from '../theme';
-import { getAuth } from 'firebase/auth';
 
 interface Props {
     route: {
@@ -103,11 +102,8 @@ export const BookingScreen: React.FC<Props> = ({ route, navigation }) => {
     const handleBook = async (slot: GeneratedSlot) => {
         setBooking(true);
         try {
-            const auth = getAuth();
-            const borrowerEmail = auth.currentUser?.email || "borrower@example.com";
-            const response = await calendarService.bookMeeting(
+            await calendarService.bookMeeting(
                 staffEmail,
-                borrowerEmail,
                 30,
                 slot.start.toISOString()
             );
@@ -277,6 +273,10 @@ const styles = StyleSheet.create({
     slotsContainer: {
         flex: 1,
         padding: theme.spacing.md,
+    },
+    sectionTitle: {
+        ...theme.typography.h3,
+        marginBottom: theme.spacing.md,
     },
     slotsListContent: {
         paddingBottom: theme.spacing.xl,

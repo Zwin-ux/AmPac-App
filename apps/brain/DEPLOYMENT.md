@@ -39,32 +39,9 @@
    docker run -p 8000:8000 --env-file .env ampac-brain
    ```
 
-### Kubernetes (GKE)
-1. Build & push:
-   ```bash
-   docker build -t gcr.io/$PROJECT_ID/brain-service:$(git rev-parse --short HEAD) .
-   docker push gcr.io/$PROJECT_ID/brain-service:$(git rev-parse --short HEAD)
-   ```
-2. Update `k8s/brain-deployment.yaml` image tag to the pushed SHA (or use `kubectl set image ...`).
-3. Apply manifests:
-   ```bash
-   kubectl apply -f k8s/brain-deployment.yaml
-   kubectl apply -f k8s/brain-hpa.yaml
-   kubectl apply -f k8s/brain-pdb.yaml
-   kubectl apply -f k8s/ingress.yaml
-   ```
-4. Verify rollout & probes:
-   ```bash
-   kubectl rollout status deployment/brain-service
-   kubectl get pods -l app=brain-service
-   kubectl logs deploy/brain-service | tail
-   ```
-5. Health checks (via LB or port-forward):
-   - `/health` (readiness/liveness)
-   - `/api/v1/health` (aggregate)
-   - `/api/v1/health/deps`
-   - `/api/v1/health/sync`
-   - `/api/v1/health/calendar`
+### Kubernetes (Deferred)
+Kubernetes deployment artifacts are intentionally removed for the lean v1 focus.
+Use Cloud Run (below) or any other managed container hosting that can provide a stable HTTPS URL.
 
 ### Google Cloud Run (Serverless)
 1.  **Install Google Cloud SDK**:
@@ -168,7 +145,7 @@ This is the minimal, high-confidence path to take the stack live for consumers.
 ## 8) Runbook (what to do during/after deploy)
 - Deploy staging; run smoke: create app -> status sync -> task completion -> Ventures dashboard shows stats.
 - If green, deploy prod; monitor error rates/latency for first 30-60 minutes.
-- Rollback: redeploy previous image tag (Cloud Run revisions) or previous hosting release; for GKE use `kubectl rollout undo deployment/brain-service`.
+- Rollback: shift traffic to the previous Cloud Run revision (or redeploy the previous image tag); verify health endpoints; replay DLQ if needed.
 
 ## Runtime Env Vars (flags/safety)
 - `GRAPH_ENABLED`, `VENTURES_ENABLED`, `SHAREFILE_ENABLED`, `BOOKINGS_ENABLED`: turn integrations on/off.
@@ -204,7 +181,7 @@ This is the minimal, high-confidence path to take the stack live for consumers.
 
 - Canary/rollback drill:
   - Canary 10% → 50% → 100% with gates: `/api/v1/health*` green; sync lag p95 < 60s; DLQ stable; booking success > 99%; no restart churn.
-  - Rollback: shift traffic to previous rev or `kubectl rollout undo deployment/brain-service`; verify health endpoints; replay DLQ if needed.
+  - Rollback: shift traffic to the previous revision (or redeploy the previous image tag); verify health endpoints; replay DLQ if needed.
   - Owners: Backend lead drives promotion; SRE/on-call approves; QA observes mobile/console smoke.
 
 ## Reliability Quick Reference
@@ -234,19 +211,31 @@ curl -s https://<host>/api/v1/health/sync
 curl -s https://<host>/api/v1/health/calendar
 ```
 
-## Canary Playbook (GKE)
-1) Deploy new image tag to canary backend or use LB split to 10%.  
-2) Verify health endpoints green; watch logs for 10–30m.  
+## Canary Playbook (Cloud Run / Provider-Agnostic)
+1) Deploy a new revision with 0% traffic and smoke test it first.  
+2) Shift 10% of traffic to the new revision; monitor for 10–30m.  
 3) Promote to 50%; re-check SLO gates: sync lag p95 < 60s, DLQ stable, booking success > 99%.  
 4) Promote to 100%.  
 5) Post-promo watch: error rate, restarts, booking latency for 30–60m.
 
-## Rollback Playbook (GKE)
+Cloud Run examples:
 ```bash
-kubectl rollout undo deployment/brain-service
-kubectl rollout status deployment/brain-service
+# Deploy without serving traffic yet
+gcloud run deploy ampac-brain --image gcr.io/$PROJECT_ID/ampac-brain --region us-central1 --no-traffic
+
+# List revisions and shift traffic (edit revision names)
+gcloud run revisions list --service ampac-brain --region us-central1
+gcloud run services update-traffic ampac-brain --region us-central1 --to-revisions REV_NEW=10,REV_OLD=90
 ```
-Then re-check health endpoints and DLQ; keep breakers/mocks aligned to restore steady state.
+
+## Rollback Playbook (Cloud Run / Provider-Agnostic)
+Rollback = shift traffic back to the previous revision (or redeploy the last known-good image tag), then verify health + DLQ.
+
+Cloud Run example:
+```bash
+gcloud run revisions list --service ampac-brain --region us-central1
+gcloud run services update-traffic ampac-brain --region us-central1 --to-revisions REV_OLD=100
+```
 
 ## Smoke Checklist (Staging)
 - `/api/v1/health` returns status ok/degraded with deps + breakers.  

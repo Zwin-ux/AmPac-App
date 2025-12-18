@@ -6,6 +6,7 @@ import { User } from '../types';
 import { auth } from '../../firebaseConfig';
 import { getCurrentUserDoc, updateUserDoc } from '../services/firestore';
 import { cacheService } from '../services/cache';
+import { Ionicons } from '@expo/vector-icons';
 
 const CACHE_KEY_PROFILE = 'cache_user_profile';
 
@@ -207,6 +208,18 @@ export default function EditProfileScreen({ navigation }: any) {
                         ))}
                     </View>
                 </View>
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>More About You</Text>
+                    <TouchableOpacity style={styles.linkRow} onPress={() => navigation.navigate('Demographics')}>
+                        <Text style={styles.linkRowText}>Demographics (optional)</Text>
+                        <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.linkRow} onPress={() => navigation.navigate('Skills')}>
+                        <Text style={styles.linkRowText}>Skills & Services</Text>
+                        <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+                    </TouchableOpacity>
+                </View>
             </ScrollView>
         </SafeAreaView>
     );
@@ -331,5 +344,22 @@ const styles = StyleSheet.create({
     chipTextActive: {
         color: '#fff',
         fontWeight: 'bold',
+    },
+    linkRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 12,
+        paddingHorizontal: 12,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        borderRadius: theme.borderRadius.md,
+        backgroundColor: theme.colors.surface,
+        marginBottom: 10,
+    },
+    linkRowText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: theme.colors.text,
     },
 });

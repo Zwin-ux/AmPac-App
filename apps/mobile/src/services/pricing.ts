@@ -186,7 +186,7 @@ export const pricingService = {
             return acc;
         }, {});
 
-        const items = request.rooms.map(({ roomId, startTime, endTime }) => {
+        const items = request.rooms.map(({ roomId, startTime, endTime, attendees }) => {
             const room = roomMap[roomId];
             if (!room) {
                 const empty: PriceBreakdown = { base: 0, addOns: 0, fees: 0, taxes: 0, discounts: 0, total: 0, currency: 'USD' };
@@ -197,7 +197,7 @@ export const pricingService = {
                 startTime,
                 endTime,
                 customerTier: request.customerTier,
-                attendees: roomItem.attendees ?? 1,
+                attendees: attendees ?? 1,
             });
             return { roomId, priceBreakdown, appliedRules };
         });

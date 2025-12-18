@@ -77,7 +77,7 @@ export default function SpacesScreen() {
                     )}
                 </View>
                 <View style={styles.cardContent}>
-                    <View style={styles.headerRow}>
+                    <View style={styles.cardHeaderRow}>
                         <Text style={styles.roomName}>{item.name}</Text>
                         <View style={styles.tierBadge}>
                             <Text style={styles.tierText}>Tiered pricing</Text>
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
     cardContent: {
         padding: theme.spacing.md,
     },
-    headerRow: {
+    cardHeaderRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',

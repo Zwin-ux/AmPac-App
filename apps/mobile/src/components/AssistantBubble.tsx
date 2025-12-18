@@ -37,8 +37,6 @@ const styles = StyleSheet.create({
         borderRadius: 24,
         paddingHorizontal: 12,
         paddingVertical: 10,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
         ...theme.shadows.card,
         gap: 8,
     },

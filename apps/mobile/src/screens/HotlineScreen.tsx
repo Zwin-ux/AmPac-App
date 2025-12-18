@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, Modal } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, Modal, Linking } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../theme';
@@ -7,13 +7,147 @@ import { createHotlineRequest } from '../services/firestore';
 import { auth } from '../../firebaseConfig';
 import AssistantBubble from '../components/AssistantBubble';
 import { notifySupportChannel } from '../services/notifications';
+import { Ionicons } from '@expo/vector-icons';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+
+type ResourceCategory = 'All' | 'Videos' | 'Credit' | 'Tools' | 'Consulting' | 'Contact';
+type SupportResource = {
+    title: string;
+    subtitle: string;
+    url: string;
+    category: Exclude<ResourceCategory, 'All'>;
+    icon: string;
+    badge?: string;
+};
+
+const SUPPORT_RESOURCES: SupportResource[] = [
+    {
+        title: 'ABCEE | Advancing Impact',
+        subtitle: 'Video playlist',
+        url: 'https://youtube.com/playlist?list=PLDBKt0HjN_ILd5O-rJ8F0Qn1s-sBttwZJ&si=TOdR8lz-hCU59fMq',
+        category: 'Videos',
+        icon: 'play-circle-outline',
+        badge: 'YouTube',
+    },
+    {
+        title: 'ABCEE | KYN: Numbers + Network',
+        subtitle: 'Video playlist',
+        url: 'https://youtube.com/playlist?list=PLDBKt0HjN_IKrfIL1Bfs7JHWvqfZcVVId&si=LoP1GGAqgOmG44F0',
+        category: 'Videos',
+        icon: 'stats-chart-outline',
+        badge: 'YouTube',
+    },
+    {
+        title: 'CFB 2024',
+        subtitle: 'Flip-book resource',
+        url: 'https://heyzine.com/flip-book/5fa991118c.html',
+        category: 'Videos',
+        icon: 'book-outline',
+        badge: 'Guide',
+    },
+    {
+        title: 'Business Power Tools',
+        subtitle: 'Business plan + SBA resources',
+        url: 'https://www.businesspowertools.com/ampac-business-plan-for-sba-loans-and-investor-funding/',
+        category: 'Tools',
+        icon: 'construct-outline',
+        badge: 'Partner',
+    },
+    {
+        title: 'Ecredable Business Credit Lift',
+        subtitle: 'Build business credit profile',
+        url: 'https://business.ecredable.com/ampac',
+        category: 'Credit',
+        icon: 'briefcase-outline',
+        badge: 'Partner',
+    },
+    {
+        title: 'Ecredable Personal Credit Lift',
+        subtitle: 'Improve personal credit',
+        url: 'https://ecredable.com/ampac',
+        category: 'Credit',
+        icon: 'person-outline',
+        badge: 'Partner',
+    },
+    {
+        title: 'SBDC Free Consulting',
+        subtitle: 'Local small business consulting',
+        url: 'https://americassbdc.org/',
+        category: 'Consulting',
+        icon: 'people-outline',
+        badge: 'Free',
+    },
+    {
+        title: 'SCORE Free Mentoring',
+        subtitle: 'Mentors + templates + workshops',
+        url: 'https://www.score.org/?gad_source=1&gclid=Cj0KCQjw4MSzBhC8ARIsAPFOuyUZjmnAbtDO8xSJ6GNxkpHv2AT97zeN5W7bB6H5ofarJuZQbbrehRUaAhBHEALw_wcB',
+        category: 'Consulting',
+        icon: 'school-outline',
+        badge: 'Free',
+    },
+    {
+        title: "Women’s Business Center",
+        subtitle: 'SBA resource partners',
+        url: 'https://www.sba.gov/local-assistance/resource-partners/womens-business-centers',
+        category: 'Consulting',
+        icon: 'heart-outline',
+        badge: 'Free',
+    },
+    {
+        title: "The Company Dr’s",
+        subtitle: 'Advisory + business services',
+        url: 'https://www.thecompanydrs.com/',
+        category: 'Consulting',
+        icon: 'medical-outline',
+        badge: 'Partner',
+    },
+    {
+        title: 'ABCEE Contact Card',
+        subtitle: 'Quick contact info',
+        url: 'https://hihello.me/p/aa9827b2-b576-44bb-87bc-bbf9182a4eb0',
+        category: 'Contact',
+        icon: 'card-outline',
+    },
+    {
+        title: 'AmPac AI Support Agent (Free)',
+        subtitle: 'Instant answers + guidance',
+        url: 'https://ampac-chat-bot-668f10cafef2.herokuapp.com/',
+        category: 'Contact',
+        icon: 'chatbubbles-outline',
+        badge: 'Free',
+    },
+];
 
 export default function HotlineScreen() {
     const [subject, setSubject] = useState('');
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
     const [modalVisible, setModalVisible] = useState(false);
+    const [resourceCategory, setResourceCategory] = useState<ResourceCategory>('All');
+    const [resourceQuery, setResourceQuery] = useState('');
     const navigation = useNavigation();
+
+    const openUrl = async (url: string) => {
+        try {
+            const supported = await Linking.canOpenURL(url);
+            if (!supported) {
+                Alert.alert('Error', 'Cannot open this link on your device.');
+                return;
+            }
+            await Linking.openURL(url);
+        } catch (err) {
+            console.error('Failed to open URL', url, err);
+            Alert.alert('Error', 'Could not open the link. Please try again.');
+        }
+    };
+
+    const filteredResources = SUPPORT_RESOURCES.filter((item) => {
+        const matchesCategory = resourceCategory === 'All' ? true : item.category === resourceCategory;
+        const q = resourceQuery.trim().toLowerCase();
+        const matchesQuery = !q ? true : `${item.title} ${item.subtitle}`.toLowerCase().includes(q);
+        return matchesCategory && matchesQuery;
+    });
 
     const handleSubmit = async () => {
         if (!subject || !message) {
@@ -71,6 +205,34 @@ export default function HotlineScreen() {
             </View>
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
+                <Card style={styles.heroCard}>
+                    <View style={styles.heroTopRow}>
+                        <View style={styles.heroIcon}>
+                            <Ionicons name="help-circle-outline" size={18} color={theme.colors.text} />
+                        </View>
+                        <Text style={styles.heroEyebrow}>Fast Help</Text>
+                    </View>
+                    <Text style={styles.heroTitle}>Get support in seconds</Text>
+                    <Text style={styles.heroSubtitle}>
+                        Use the AI agent for quick answers, or send a message and a business advisor will follow up.
+                    </Text>
+                    <View style={styles.heroActions}>
+                        <Button
+                            title="OPEN AI AGENT"
+                            onPress={() => openUrl('https://ampac-chat-bot-668f10cafef2.herokuapp.com/')}
+                            icon={<Ionicons name="sparkles-outline" size={16} color="#fff" />}
+                            style={{ flex: 1 }}
+                        />
+                        <Button
+                            title="CONTACT CARD"
+                            variant="secondary"
+                            onPress={() => openUrl('https://hihello.me/p/aa9827b2-b576-44bb-87bc-bbf9182a4eb0')}
+                            icon={<Ionicons name="card-outline" size={16} color={theme.colors.text} />}
+                            style={{ flex: 1 }}
+                        />
+                    </View>
+                </Card>
+
                 <View style={styles.introSection}>
                     <Text style={styles.title}>How can we help?</Text>
                     <Text style={styles.subtitle}>
@@ -120,6 +282,70 @@ export default function HotlineScreen() {
                     <TouchableOpacity style={styles.taButton} onPress={() => setModalVisible(true)}>
                         <Text style={styles.taButtonText}>Schedule Session</Text>
                     </TouchableOpacity>
+                </View>
+
+                <View style={styles.resourcesSection}>
+                    <Text style={styles.resourcesTitle}>Resources</Text>
+                    <Text style={styles.resourcesSubtitle}>Videos, tools, credit programs, and free consulting partners.</Text>
+
+                    <View style={styles.searchRow}>
+                        <Ionicons name="search-outline" size={18} color={theme.colors.textSecondary} />
+                        <TextInput
+                            style={styles.searchInput}
+                            placeholder="Search resources"
+                            placeholderTextColor={theme.colors.textSecondary}
+                            value={resourceQuery}
+                            onChangeText={setResourceQuery}
+                            autoCapitalize="none"
+                        />
+                        {resourceQuery ? (
+                            <TouchableOpacity onPress={() => setResourceQuery('')} style={styles.clearBtn}>
+                                <Ionicons name="close-circle" size={18} color={theme.colors.textSecondary} />
+                            </TouchableOpacity>
+                        ) : null}
+                    </View>
+
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsRow}>
+                        {(['All', 'Videos', 'Credit', 'Tools', 'Consulting', 'Contact'] as ResourceCategory[]).map((cat) => (
+                            <TouchableOpacity
+                                key={cat}
+                                style={[styles.chip, resourceCategory === cat && styles.chipActive]}
+                                onPress={() => setResourceCategory(cat)}
+                            >
+                                <Text style={[styles.chipText, resourceCategory === cat && styles.chipTextActive]}>
+                                    {cat}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+
+                    <View style={styles.resourceList}>
+                        {filteredResources.map((item) => (
+                            <TouchableOpacity
+                                key={item.url}
+                                style={styles.resourceRow}
+                                onPress={() => openUrl(item.url)}
+                                activeOpacity={0.85}
+                            >
+                                <View style={styles.resourceIconWrap}>
+                                    <Ionicons name={item.icon as any} size={18} color={theme.colors.text} />
+                                </View>
+                                <View style={styles.resourceText}>
+                                    <Text style={styles.resourceTitle}>{item.title}</Text>
+                                    <Text style={styles.resourceSubtitleText}>{item.subtitle}</Text>
+                                </View>
+                                {item.badge ? (
+                                    <View style={styles.badge}>
+                                        <Text style={styles.badgeText}>{item.badge}</Text>
+                                    </View>
+                                ) : null}
+                                <Ionicons name="open-outline" size={18} color={theme.colors.textSecondary} />
+                            </TouchableOpacity>
+                        ))}
+                        {filteredResources.length === 0 ? (
+                            <Text style={styles.noResults}>No matches. Try a different search.</Text>
+                        ) : null}
+                    </View>
                 </View>
             </ScrollView>
 
@@ -203,6 +429,42 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         padding: theme.spacing.lg,
+    },
+    heroCard: {
+        marginBottom: theme.spacing.lg,
+        padding: theme.spacing.lg,
+    },
+    heroTopRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: theme.spacing.sm,
+        gap: theme.spacing.sm,
+    },
+    heroIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: theme.borderRadius.md,
+        backgroundColor: theme.colors.surfaceHighlight,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    heroEyebrow: {
+        ...theme.typography.label as any,
+    },
+    heroTitle: {
+        ...theme.typography.h2,
+        marginBottom: theme.spacing.xs,
+    },
+    heroSubtitle: {
+        ...theme.typography.body,
+        color: theme.colors.textSecondary,
+        marginBottom: theme.spacing.md,
+    },
+    heroActions: {
+        flexDirection: 'row',
+        gap: theme.spacing.sm,
     },
     introSection: {
         marginBottom: theme.spacing.xl,
@@ -301,6 +563,121 @@ const styles = StyleSheet.create({
         color: theme.colors.primary,
         fontSize: 16,
         fontWeight: '600',
+    },
+    resourcesSection: {
+        marginTop: theme.spacing.xl,
+        paddingBottom: theme.spacing.xl,
+    },
+    resourcesTitle: {
+        ...theme.typography.h2,
+        marginBottom: 4,
+    },
+    resourcesSubtitle: {
+        ...theme.typography.body,
+        color: theme.colors.textSecondary,
+        marginBottom: theme.spacing.md,
+    },
+    searchRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.borderRadius.md,
+        paddingHorizontal: theme.spacing.md,
+        paddingVertical: 10,
+        gap: theme.spacing.sm,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 15,
+        color: theme.colors.text,
+        paddingVertical: 0,
+    },
+    clearBtn: {
+        padding: 2,
+    },
+    chipsRow: {
+        marginTop: theme.spacing.md,
+        marginBottom: theme.spacing.md,
+    },
+    chip: {
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: theme.borderRadius.round,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        backgroundColor: theme.colors.surface,
+        marginRight: 8,
+    },
+    chipActive: {
+        backgroundColor: theme.colors.primary,
+        borderColor: theme.colors.primary,
+    },
+    chipText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: theme.colors.textSecondary,
+        letterSpacing: 0.2,
+    },
+    chipTextActive: {
+        color: '#fff',
+    },
+    resourceList: {
+        gap: theme.spacing.sm,
+    },
+    resourceRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: theme.spacing.md,
+        backgroundColor: theme.colors.surface,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        borderRadius: theme.borderRadius.md,
+        gap: theme.spacing.md,
+    },
+    resourceIconWrap: {
+        width: 36,
+        height: 36,
+        borderRadius: theme.borderRadius.md,
+        backgroundColor: theme.colors.surfaceHighlight,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    resourceText: {
+        flex: 1,
+    },
+    resourceTitle: {
+        fontSize: 14,
+        fontWeight: '800',
+        color: theme.colors.text,
+        marginBottom: 2,
+    },
+    resourceSubtitleText: {
+        fontSize: 13,
+        color: theme.colors.textSecondary,
+        lineHeight: 18,
+    },
+    badge: {
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: theme.borderRadius.round,
+        backgroundColor: theme.colors.surfaceHighlight,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        marginRight: theme.spacing.sm,
+    },
+    badgeText: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: theme.colors.textSecondary,
+        letterSpacing: 0.2,
+    },
+    noResults: {
+        ...theme.typography.caption,
+        marginTop: theme.spacing.md,
     },
     modalOverlay: {
         flex: 1,
