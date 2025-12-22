@@ -11,9 +11,11 @@ import {
     arrayUnion,
     arrayRemove,
     deleteDoc,
+    deleteField,
     Timestamp
 } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
+import { getCurrentUserId, getCurrentDisplayName } from './authUtils';
 import { Business, BusinessRole } from '../types';
 import { chatService } from './chatService';
 import { notificationService } from './notificationService';
@@ -23,10 +25,11 @@ export const businessService = {
      * Create a new business and its associated private internal channel.
      */
     createBusiness: async (name: string, industry: string, bio: string): Promise<string> => {
-        const user = auth.currentUser;
-        if (!user) throw new Error("Authentication required");
+        const uid = getCurrentUserId();
+        if (!uid) throw new Error("User not authenticated");
+        const displayName = getCurrentDisplayName();
 
-        const businessId = user.uid; // One business per user for now
+        const businessId = uid; // One business per user for now
         const businessRef = doc(db, 'businesses', businessId);
 
         // 1. Create the private channel for the business members
@@ -39,14 +42,14 @@ export const businessService = {
 
         const newBusiness: Business = {
             id: businessId,
-            ownerId: user.uid,
-            ownerName: user.displayName || 'Owner',
+            ownerId: uid,
+            ownerName: displayName,
             name,
             industry,
             city: 'Inland Empire', // Default
             bio,
             members: {
-                [user.uid]: 'owner'
+                [uid]: 'owner'
             },
             chatChannelId: channelId,
             inviteCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
@@ -147,5 +150,83 @@ export const businessService = {
             inviteCode: newCode
         });
         return newCode;
+    },
+
+    /**
+     * Update business profile.
+     */
+    updateBusiness: async (businessId: string, updates: Partial<Business>): Promise<void> => {
+        const bizRef = doc(db, 'businesses', businessId);
+        await updateDoc(bizRef, {
+            ...updates,
+            updatedAt: serverTimestamp()
+        });
+    },
+
+    /**
+     * Get all businesses (for network view).
+     */
+    getAllBusinesses: async (): Promise<Business[]> => {
+        const snapshot = await getDocs(collection(db, 'businesses'));
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Business));
+    },
+
+    /**
+     * Get businesses by industry.
+     */
+    getBusinessesByIndustry: async (industry: string): Promise<Business[]> => {
+        const q = query(collection(db, 'businesses'), where('industry', '==', industry));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Business));
+    },
+
+    /**
+     * Check if current user owns or is member of a business.
+     */
+    getUserBusiness: async (): Promise<Business | null> => {
+        const user = auth.currentUser;
+        if (!user) return null;
+
+        // First check if they own a business
+        const ownedBiz = await businessService.getBusiness(user.uid);
+        if (ownedBiz) return ownedBiz;
+
+        // Check if member of any business
+        const allBiz = await businessService.getAllBusinesses();
+        return allBiz.find(b => b.members && b.members[user.uid]) || null;
+    },
+
+    /**
+     * Add badge to business (admin only).
+     */
+    addBadge: async (businessId: string, badge: string): Promise<void> => {
+        const bizRef = doc(db, 'businesses', businessId);
+        await updateDoc(bizRef, {
+            badges: arrayUnion(badge)
+        });
+    },
+
+    /**
+     * Verify a business (admin only).
+     */
+    verifyBusiness: async (businessId: string): Promise<void> => {
+        const bizRef = doc(db, 'businesses', businessId);
+        await updateDoc(bizRef, {
+            isVerified: true,
+            verifiedAt: serverTimestamp(),
+            badges: arrayUnion('verified')
+        });
+    },
+
+    /**
+     * Search businesses by name.
+     */
+    searchBusinesses: async (searchTerm: string): Promise<Business[]> => {
+        const allBiz = await businessService.getAllBusinesses();
+        const term = searchTerm.toLowerCase();
+        return allBiz.filter(b => 
+            b.name.toLowerCase().includes(term) || 
+            b.industry?.toLowerCase().includes(term)
+        );
     }
 };

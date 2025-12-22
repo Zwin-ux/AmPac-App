@@ -447,6 +447,7 @@ export interface FeedPost {
 
     content: string;
     mediaUrls?: string[];
+    hashtags?: string[]; // Extracted hashtags for filtering/search
 
     likes: string[]; // Array of UIDs
     commentCount: number;
@@ -492,3 +493,51 @@ export interface Notification {
     createdAt: Timestamp;
 }
 
+// =====================
+// Calendar Types
+// =====================
+
+export type CalendarEventType = 'personal' | 'community' | 'loan_milestone' | 'meeting' | 'task';
+
+export type RecurrencePattern = 'none' | 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'yearly';
+
+export interface CalendarEvent {
+    id: string;
+    userId: string;
+    title: string;
+    description?: string;
+    location?: string;
+    
+    startDate: Timestamp;
+    endDate: Timestamp;
+    allDay?: boolean;
+    
+    type: CalendarEventType;
+    color?: string; // Custom color for event
+    
+    // Recurrence
+    recurrence: RecurrencePattern;
+    recurrenceEndDate?: Timestamp;
+    
+    // Reminders (minutes before)
+    reminders?: number[];
+    
+    // Linking
+    linkedEventId?: string; // Community event ID if synced
+    linkedApplicationId?: string; // Loan application ID for milestones
+    
+    // Status
+    completed?: boolean;
+    
+    createdAt: Timestamp;
+    updatedAt?: Timestamp;
+}
+
+export interface CalendarReminder {
+    id: string;
+    eventId: string;
+    userId: string;
+    scheduledFor: Timestamp;
+    sent: boolean;
+    createdAt: Timestamp;
+}

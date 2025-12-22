@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, ScrollView, Modal, Alert, Linking, Image, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, ScrollView, Modal, Alert, Linking, Image, KeyboardAvoidingView, Platform, RefreshControl } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../theme';
@@ -9,6 +9,7 @@ import { getEvents, createEvent } from '../services/events';
 import { feedService } from '../services/feedService';
 import { chatService } from '../services/chatService';
 import { businessService } from '../services/businessService';
+import { getCurrentUserId, isDevUser } from '../services/authUtils';
 import { Ionicons } from '@expo/vector-icons';
 import { format, formatDistanceToNow } from 'date-fns';
 import { auth } from '../../firebaseConfig';
@@ -136,9 +137,18 @@ export default function SocialHubScreen() {
         setCreatingEvent(true);
         try {
             const { Timestamp } = await import('firebase/firestore');
-            const eventDate = typeof newEvent.date === 'string' && newEvent.date
-                ? Timestamp.fromDate(new Date(newEvent.date))
-                : Timestamp.now();
+            
+            let eventDate;
+            if (typeof newEvent.date === 'string' && newEvent.date) {
+                const parsedDate = new Date(newEvent.date);
+                if (isNaN(parsedDate.getTime())) {
+                    eventDate = Timestamp.now();
+                } else {
+                    eventDate = Timestamp.fromDate(parsedDate);
+                }
+            } else {
+                eventDate = Timestamp.now();
+            }
 
             await createEvent({
                 title: newEvent.title,
@@ -273,8 +283,8 @@ export default function SocialHubScreen() {
                         <View style={{ flex: 1 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                 <Text style={styles.cardTitle}>{eventItem.title}</Text>
-                                {eventItem.pinned && <View style={styles.pinnedBadge}><Ionicons name="pin" size={10} color="#fff" /></View>}
-                                {eventItem.featured && <View style={styles.featuredBadge}><Text style={styles.badgeText}>FEATURED</Text></View>}
+                                {!!eventItem.pinned && <View style={styles.pinnedBadge}><Ionicons name="pin" size={10} color="#fff" /></View>}
+                                {!!eventItem.featured && <View style={styles.featuredBadge}><Text style={styles.badgeText}>FEATURED</Text></View>}
                             </View>
                             <Text style={styles.cardSubtitle}>
                                 {eventItem.date instanceof Timestamp ? format(eventItem.date.toDate(), 'PPPp') : eventItem.date}
@@ -299,7 +309,7 @@ export default function SocialHubScreen() {
                             </Text>
                         </TouchableOpacity>
                     </View>
-                </View >
+                </View>
             );
         }
 
@@ -314,11 +324,40 @@ export default function SocialHubScreen() {
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                             <Text style={styles.cardTitle}>{feedPostItem.authorName || 'Unknown'}</Text>
                             {renderBadges(feedPostItem.authorBadges)}
-                            {feedPostItem.pinned && <View style={styles.pinnedBadge}><Ionicons name="pin" size={10} color="#fff" /></View>}
-                            {feedPostItem.featured && <View style={styles.featuredBadge}><Text style={styles.badgeText}>FEATURED</Text></View>}
+                            {!!feedPostItem.pinned && <View style={styles.pinnedBadge}><Ionicons name="pin" size={10} color="#fff" /></View>}
+                            {!!feedPostItem.featured && <View style={styles.featuredBadge}><Text style={styles.badgeText}>FEATURED</Text></View>}
                         </View>
                         <Text style={styles.cardSubtitle}>{feedPostItem.type} • {feedPostItem.createdAt ? formatDistanceToNow(feedPostItem.createdAt.toDate(), { addSuffix: true }) : ''}</Text>
                     </View>
+                    {(feedPostItem.authorId === getCurrentUserId()) && (
+                        <TouchableOpacity 
+                            style={{ marginLeft: 'auto', padding: 4 }}
+                            onPress={() => {
+                                Alert.alert(
+                                    "Delete Post",
+                                    "Are you sure you want to delete this post?",
+                                    [
+                                        { text: "Cancel", style: "cancel" },
+                                        { 
+                                            text: "Delete", 
+                                            style: "destructive",
+                                            onPress: async () => {
+                                                try {
+                                                    await feedService.deletePost(feedPostItem.id);
+                                                    showToast({ message: "Post deleted", type: 'success' });
+                                                    onRefresh(); // Refresh the feed
+                                                } catch (error) {
+                                                    showToast({ message: "Failed to delete post", type: 'error' });
+                                                }
+                                            }
+                                        }
+                                    ]
+                                );
+                            }}
+                        >
+                            <Ionicons name="trash-outline" size={18} color={theme.colors.textSecondary} />
+                        </TouchableOpacity>
+                    )}
                 </View>
                 <Text style={styles.cardBody}>{feedPostItem.content}</Text>
                 <View style={styles.cardFooter}>
@@ -392,6 +431,9 @@ export default function SocialHubScreen() {
                 data={data}
                 keyExtractor={(item: any) => `${item._type}-${item.id}`}
                 contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                }
                 renderItem={({ item }: { item: any }) => (
                     <View style={styles.card}>
                         <View style={styles.headerRow}>
@@ -474,37 +516,178 @@ export default function SocialHubScreen() {
         <SafeAreaView style={styles.container} edges={['top']}>
             {/* --- HEADER --- */}
             <View style={styles.header}>
-                <Text style={styles.headerTitle}>Social Hub</Text>
+                <Text style={styles.headerTitle}>Ecosystem</Text>
+                <TouchableOpacity 
+                    style={styles.headerSearchBtn}
+                    onPress={() => setSearchQuery(searchQuery ? '' : ' ')}
+                >
+                    <Ionicons name="search" size={20} color={theme.colors.text} />
+                </TouchableOpacity>
             </View>
 
             {/* --- TABS --- */}
             <View style={styles.tabBar}>
                 <TouchableOpacity onPress={() => setActiveTab('feed')} style={[styles.tabItem, activeTab === 'feed' && styles.tabItemActive]}>
-                    <Text style={[styles.tabText, activeTab === 'feed' && styles.tabTextActive]}>Communities</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setActiveTab('chat')} style={[styles.tabItem, activeTab === 'chat' && styles.tabItemActive]}>
-                    <Text style={[styles.tabText, activeTab === 'chat' && styles.tabTextActive]}>Chat</Text>
+                    <Ionicons name="home-outline" size={18} color={activeTab === 'feed' ? theme.colors.primary : theme.colors.textSecondary} />
+                    <Text style={[styles.tabText, activeTab === 'feed' && styles.tabTextActive]}>Home</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setActiveTab('network')} style={[styles.tabItem, activeTab === 'network' && styles.tabItemActive]}>
-                    <Text style={[styles.tabText, activeTab === 'network' && styles.tabTextActive]}>Businesses</Text>
+                    <Ionicons name="business-outline" size={18} color={activeTab === 'network' ? theme.colors.primary : theme.colors.textSecondary} />
+                    <Text style={[styles.tabText, activeTab === 'network' && styles.tabTextActive]}>Network</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setActiveTab('chat')} style={[styles.tabItem, activeTab === 'chat' && styles.tabItemActive]}>
+                    <Ionicons name="chatbubbles-outline" size={18} color={activeTab === 'chat' ? theme.colors.primary : theme.colors.textSecondary} />
+                    <Text style={[styles.tabText, activeTab === 'chat' && styles.tabTextActive]}>Chat</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setActiveTab('profile')} style={[styles.tabItem, activeTab === 'profile' && styles.tabItemActive]}>
-                    <Text style={[styles.tabText, activeTab === 'profile' && styles.tabTextActive]}>Profile</Text>
+                    <Ionicons name="person-outline" size={18} color={activeTab === 'profile' ? theme.colors.primary : theme.colors.textSecondary} />
+                    <Text style={[styles.tabText, activeTab === 'profile' && styles.tabTextActive]}>Me</Text>
                 </TouchableOpacity>
             </View>
 
             {/* --- CONTENT --- */}
             <View style={styles.content}>
                 {activeTab === 'feed' && (
-                    <FlatList
-                        data={feedItems}
-                        renderItem={renderFeedItem}
-                        keyExtractor={item => item.id}
-                        contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
-                        refreshing={loadingFeed || refreshing}
-                        onRefresh={onRefresh}
-                        ListEmptyComponent={
-                            loadingFeed ? (
+                    <ScrollView 
+                        style={{ flex: 1 }}
+                        contentContainerStyle={{ paddingBottom: 100 }}
+                        refreshControl={
+                            <RefreshControl refreshing={loadingFeed || refreshing} onRefresh={onRefresh} />
+                        }
+                    >
+                        {/* Community Overview Card */}
+                        <View style={styles.overviewCard}>
+                            <View style={styles.overviewHeader}>
+                                <Text style={styles.overviewTitle}>AmPac Ecosystem</Text>
+                                <View style={styles.liveBadge}>
+                                    <View style={styles.liveDot} />
+                                    <Text style={styles.liveText}>LIVE</Text>
+                                </View>
+                            </View>
+                            <View style={styles.statsRow}>
+                                <View style={styles.statItem}>
+                                    <Text style={styles.statNumber}>{businesses.length}</Text>
+                                    <Text style={styles.statLabel}>Businesses</Text>
+                                </View>
+                                <View style={styles.statDivider} />
+                                <View style={styles.statItem}>
+                                    <Text style={styles.statNumber}>{events.length}</Text>
+                                    <Text style={styles.statLabel}>Events</Text>
+                                </View>
+                                <View style={styles.statDivider} />
+                                <View style={styles.statItem}>
+                                    <Text style={styles.statNumber}>{staff.length}</Text>
+                                    <Text style={styles.statLabel}>Staff</Text>
+                                </View>
+                            </View>
+                        </View>
+
+                        {/* Quick Actions Bar */}
+                        <View style={styles.quickActionsBar}>
+                            <TouchableOpacity style={styles.quickAction} onPress={() => setShowCreatePost(true)}>
+                                <Ionicons name="create-outline" size={20} color={theme.colors.primary} />
+                                <Text style={styles.quickActionText}>Post</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.quickAction} onPress={() => setShowCreateEventModal(true)}>
+                                <Ionicons name="calendar-outline" size={20} color={theme.colors.secondary} />
+                                <Text style={styles.quickActionText}>Event</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.quickAction} onPress={() => setShowCreateBusiness(true)}>
+                                <Ionicons name="storefront-outline" size={20} color="#E65100" />
+                                <Text style={styles.quickActionText}>Business</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.quickAction} onPress={() => setShowJoinTeam(true)}>
+                                <Ionicons name="people-outline" size={20} color="#1565C0" />
+                                <Text style={styles.quickActionText}>Join</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Upcoming Events - Horizontal */}
+                        {events.length > 0 ? (
+                            <View style={styles.horizontalSection}>
+                                <View style={styles.sectionHeader}>
+                                    <Text style={styles.sectionTitle}>Upcoming Events</Text>
+                                    <TouchableOpacity onPress={() => setActiveTab('network')}>
+                                        <Text style={styles.seeAllBtn}>See All</Text>
+                                    </TouchableOpacity>
+                                </View>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
+                                    {events.slice(0, 5).map(event => (
+                                        <TouchableOpacity key={event.id} style={styles.horizontalEventCard}>
+                                            <View style={styles.eventDateBadge}>
+                                                <Text style={styles.eventDay}>{format(event.date instanceof Timestamp ? event.date.toDate() : new Date(event.date), 'd')}</Text>
+                                                <Text style={styles.eventMonth}>{format(event.date instanceof Timestamp ? event.date.toDate() : new Date(event.date), 'MMM')}</Text>
+                                            </View>
+                                            <Text style={styles.horizontalCardTitle} numberOfLines={2}>{event.title}</Text>
+                                            <View style={styles.eventLocationRow}>
+                                                <Ionicons name="location-outline" size={12} color={theme.colors.textSecondary} />
+                                                <Text style={styles.eventLocationText} numberOfLines={1}>{event.location || 'TBD'}</Text>
+                                            </View>
+                                            <TouchableOpacity
+                                                style={[styles.miniAttendBtn, event.attendees?.includes(auth.currentUser?.uid || '') && styles.miniAttendBtnActive]}
+                                                onPress={() => handleToggleRSVP(event.id, !event.attendees?.includes(auth.currentUser?.uid || ''))}
+                                            >
+                                                <Text style={[styles.miniAttendBtnText, event.attendees?.includes(auth.currentUser?.uid || '') && styles.miniAttendBtnTextActive]}>
+                                                    {event.attendees?.includes(auth.currentUser?.uid || '') ? '✓ Going' : 'RSVP'}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        ) : null}
+
+                        {/* Featured Businesses - Horizontal */}
+                        {businesses.length > 0 ? (
+                            <View style={styles.horizontalSection}>
+                                <View style={styles.sectionHeader}>
+                                    <Text style={styles.sectionTitle}>Business Network</Text>
+                                    <TouchableOpacity onPress={() => setActiveTab('network')}>
+                                        <Text style={styles.seeAllBtn}>See All</Text>
+                                    </TouchableOpacity>
+                                </View>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
+                                    {businesses.slice(0, 6).map(biz => (
+                                        <TouchableOpacity 
+                                            key={biz.id} 
+                                            style={styles.horizontalBizCard}
+                                            onPress={() => navigation.navigate('BusinessAdmin', { businessId: biz.id })}
+                                        >
+                                            <View style={[styles.bizAvatar, { backgroundColor: theme.colors.primary }]}>
+                                                <Text style={styles.bizAvatarText}>{biz.name?.charAt(0) || '?'}</Text>
+                                            </View>
+                                            <Text style={styles.horizontalBizName} numberOfLines={1}>{biz.name}</Text>
+                                            <Text style={styles.horizontalBizIndustry} numberOfLines={1}>{biz.industry || 'Business'}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        ) : null}
+
+                        {/* AMPAC Staff - Horizontal */}
+                        {staff.length > 0 ? (
+                            <View style={styles.horizontalSection}>
+                                <View style={styles.sectionHeader}>
+                                    <Text style={styles.sectionTitle}>AMPAC Team</Text>
+                                </View>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
+                                    {staff.slice(0, 6).map(member => (
+                                        <View key={member.id} style={styles.staffCard}>
+                                            <View style={[styles.staffAvatar, { backgroundColor: theme.colors.secondary }]}>
+                                                <Text style={styles.staffAvatarText}>{member.name?.charAt(0) || '?'}</Text>
+                                            </View>
+                                            <Text style={styles.staffName} numberOfLines={1}>{member.name}</Text>
+                                            <Text style={styles.staffTitle} numberOfLines={1}>{member.title}</Text>
+                                        </View>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        ) : null}
+
+                        {/* Community Feed */}
+                        <View style={styles.feedSection}>
+                            <Text style={styles.sectionTitle}>Community Feed</Text>
+                            {loadingFeed ? (
                                 <View style={{ gap: 12 }}>
                                     {[1, 2, 3].map(i => (
                                         <View key={i} style={styles.card}>
@@ -520,6 +703,12 @@ export default function SocialHubScreen() {
                                         </View>
                                     ))}
                                 </View>
+                            ) : feedItems.length > 0 ? (
+                                feedItems.map(item => (
+                                    <View key={item.id}>
+                                        {renderFeedItem({ item })}
+                                    </View>
+                                ))
                             ) : (
                                 <EmptyState
                                     title="No Community Posts"
@@ -528,9 +717,9 @@ export default function SocialHubScreen() {
                                     actionLabel="Create Post"
                                     onAction={() => setShowCreatePost(true)}
                                 />
-                            )
-                        }
-                    />
+                            )}
+                        </View>
+                    </ScrollView>
                 )}
 
                 {activeTab === 'chat' && (
@@ -581,6 +770,77 @@ export default function SocialHubScreen() {
                     </Text>
                 </TouchableOpacity>
             )}
+
+            {/* --- CREATE EVENT MODAL --- */}
+            <Modal
+                visible={showCreateEventModal}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setShowCreateEventModal(false)}
+            >
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.modalOverlay}
+                >
+                    <View style={styles.modalContent}>
+                        <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
+                            <View style={styles.modalHeader}>
+                                <TouchableOpacity
+                                    onPress={() => setShowCreateEventModal(false)}
+                                    style={styles.headerIconButton}
+                                >
+                                    <Ionicons name="close-circle" size={32} color={theme.colors.secondary} />
+                                    <Text style={[styles.minimizeText, { color: theme.colors.secondary }]}>Close</Text>
+                                </TouchableOpacity>
+                                <Text style={styles.modalTitle}>New Event</Text>
+                                <View style={{ width: 60 }} />
+                            </View>
+
+                            <TextInput
+                                style={styles.modalInput}
+                                placeholder="Event Title"
+                                value={newEvent.title}
+                                onChangeText={(val) => setNewEvent({ ...newEvent, title: val })}
+                            />
+
+                            <TextInput
+                                style={[styles.modalInput, styles.modalTextArea]}
+                                placeholder="Description"
+                                value={newEvent.description}
+                                onChangeText={(val) => setNewEvent({ ...newEvent, description: val })}
+                                multiline
+                            />
+
+                            <TextInput
+                                style={styles.modalInput}
+                                placeholder="Location (or Virtual Link)"
+                                value={newEvent.location}
+                                onChangeText={(val) => setNewEvent({ ...newEvent, location: val })}
+                            />
+
+                            <TextInput
+                                style={styles.modalInput}
+                                placeholder="Date (YYYY-MM-DD HH:MM)"
+                                value={newEvent.date}
+                                onChangeText={(val) => setNewEvent({ ...newEvent, date: val })}
+                            />
+
+                            <View style={styles.modalButtons}>
+                                <TouchableOpacity onPress={() => setShowCreateEventModal(false)} style={styles.modalButtonCancel}>
+                                    <Text style={styles.modalButtonTextCancel}>Cancel</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    onPress={handleCreateEvent}
+                                    style={[styles.modalButtonPrimary, { backgroundColor: theme.colors.secondary }, (!newEvent.title.trim() || creatingEvent) && { opacity: 0.5 }]}
+                                    disabled={!newEvent.title.trim() || creatingEvent}
+                                >
+                                    {creatingEvent ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalButtonTextPrimary}>Post Event</Text>}
+                                </TouchableOpacity>
+                            </View>
+                        </ScrollView>
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
 
             {/* --- CREATE CHANNEL MODAL --- */}
             <Modal
@@ -817,26 +1077,40 @@ const styles = StyleSheet.create({
         backgroundColor: '#f8f9fa',
     },
     header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
         padding: 16,
         backgroundColor: '#fff',
         borderBottomWidth: 1,
         borderBottomColor: '#eee',
     },
     headerTitle: {
-        fontSize: 20,
+        fontSize: 22,
         fontWeight: 'bold',
         color: '#1a1a1a',
+    },
+    headerSearchBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#f0f0f0',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     tabBar: {
         flexDirection: 'row',
         backgroundColor: '#fff',
-        paddingHorizontal: 16,
+        paddingHorizontal: 8,
         borderBottomWidth: 1,
         borderBottomColor: '#eee',
     },
     tabItem: {
-        paddingVertical: 12,
-        marginRight: 24,
+        flex: 1,
+        flexDirection: 'column',
+        alignItems: 'center',
+        paddingVertical: 10,
+        gap: 2,
         borderBottomWidth: 2,
         borderBottomColor: 'transparent',
     },
@@ -844,7 +1118,7 @@ const styles = StyleSheet.create({
         borderBottomColor: theme.colors.primary,
     },
     tabText: {
-        fontSize: 15,
+        fontSize: 11,
         color: '#666',
         fontWeight: '500',
     },
@@ -854,6 +1128,183 @@ const styles = StyleSheet.create({
     },
     content: {
         flex: 1,
+    },
+    // Quick Actions Bar
+    quickActionsBar: {
+        flexDirection: 'row',
+        backgroundColor: '#fff',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        marginBottom: 8,
+        gap: 12,
+    },
+    quickAction: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#f8f9fa',
+        paddingVertical: 12,
+        borderRadius: 12,
+        gap: 4,
+    },
+    quickActionText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: theme.colors.text,
+    },
+    // Horizontal Sections
+    horizontalSection: {
+        marginBottom: 16,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingTop: 16,
+        paddingBottom: 8,
+    },
+    sectionTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#1a1a1a',
+    },
+    seeAllBtn: {
+        fontSize: 13,
+        color: theme.colors.primary,
+        fontWeight: '600',
+    },
+    // Horizontal Event Card
+    horizontalEventCard: {
+        width: 160,
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 12,
+        marginRight: 12,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    eventDateBadge: {
+        width: 44,
+        height: 44,
+        backgroundColor: theme.colors.secondary,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 8,
+    },
+    eventDay: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#fff',
+    },
+    eventMonth: {
+        fontSize: 10,
+        fontWeight: '600',
+        color: 'rgba(255,255,255,0.8)',
+        textTransform: 'uppercase',
+    },
+    horizontalCardTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 4,
+    },
+    eventLocationRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        marginBottom: 8,
+    },
+    eventLocationText: {
+        fontSize: 11,
+        color: theme.colors.textSecondary,
+        flex: 1,
+    },
+    miniAttendBtn: {
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: theme.colors.secondary,
+        alignItems: 'center',
+    },
+    miniAttendBtnActive: {
+        backgroundColor: theme.colors.secondary,
+    },
+    miniAttendBtnText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: theme.colors.secondary,
+    },
+    miniAttendBtnTextActive: {
+        color: '#fff',
+    },
+    // Horizontal Business Card
+    horizontalBizCard: {
+        width: 100,
+        alignItems: 'center',
+        marginRight: 16,
+    },
+    bizAvatar: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 6,
+    },
+    bizAvatarText: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#fff',
+    },
+    horizontalBizName: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#333',
+        textAlign: 'center',
+    },
+    horizontalBizIndustry: {
+        fontSize: 11,
+        color: theme.colors.textSecondary,
+        textAlign: 'center',
+    },
+    // Staff Card
+    staffCard: {
+        width: 80,
+        alignItems: 'center',
+        marginRight: 16,
+    },
+    staffAvatar: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 4,
+    },
+    staffAvatarText: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#fff',
+    },
+    staffName: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#333',
+        textAlign: 'center',
+    },
+    staffTitle: {
+        fontSize: 10,
+        color: theme.colors.textSecondary,
+        textAlign: 'center',
+    },
+    // Feed Section
+    feedSection: {
+        padding: 16,
     },
     // Card Styles adapted from NetworkScreen
     card: {
@@ -1131,5 +1582,68 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 8,
         fontWeight: 'bold',
-    }
+    },
+    // Ecosystem Overview Styles
+    overviewCard: {
+        backgroundColor: '#fff',
+        margin: 16,
+        borderRadius: 16,
+        padding: 16,
+        ...theme.shadows.card,
+    },
+    overviewHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    overviewTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: theme.colors.text,
+    },
+    liveBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FEE2E2',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        gap: 4,
+    },
+    liveDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#EF4444',
+    },
+    liveText: {
+        fontSize: 10,
+        fontWeight: 'bold',
+        color: '#EF4444',
+    },
+    statsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-around',
+    },
+    statItem: {
+        alignItems: 'center',
+        flex: 1,
+    },
+    statNumber: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: theme.colors.primary,
+    },
+    statLabel: {
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+        marginTop: 2,
+    },
+    statDivider: {
+        width: 1,
+        height: 30,
+        backgroundColor: '#E2E8F0',
+    },
 });

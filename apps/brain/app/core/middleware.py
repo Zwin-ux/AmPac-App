@@ -69,3 +69,45 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         self.request_counts[client_ip] = history
         
         return await call_next(request)
+
+
+class APIKeyMiddleware(BaseHTTPMiddleware):
+    """
+    Optional API key validation middleware.
+    When BRAIN_API_KEY is set, requires X-API-Key header for non-public endpoints.
+    """
+    # Paths that don't require API key (public endpoints)
+    PUBLIC_PATHS = {
+        "/",
+        "/health",
+        "/docs",
+        "/redoc", 
+        "/openapi.json",
+        "/api/v1/openapi.json",
+        "/static",
+    }
+    
+    def __init__(self, app, api_key: str | None = None):
+        super().__init__(app)
+        self.api_key = api_key
+    
+    async def dispatch(self, request: Request, call_next):
+        # Skip if no API key configured (dev mode)
+        if not self.api_key:
+            return await call_next(request)
+        
+        # Skip for public paths
+        path = request.url.path
+        if any(path.startswith(p) for p in self.PUBLIC_PATHS):
+            return await call_next(request)
+        
+        # Check API key header
+        provided_key = request.headers.get("X-API-Key")
+        if provided_key != self.api_key:
+            logger.warning(f"Invalid API key attempt from {request.client.host}")
+            return Response(
+                content="Invalid or missing API key",
+                status_code=401
+            )
+        
+        return await call_next(request)

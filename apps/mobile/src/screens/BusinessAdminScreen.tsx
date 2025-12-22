@@ -43,15 +43,20 @@ export default function BusinessAdminScreen() {
             }
             setBusiness(biz);
 
-            // Fetch member profiles
+            // Fetch member profiles (defensive: biz.members may be undefined)
+            const membersObj = biz.members || {};
             const memberList = await Promise.all(
-                Object.entries(biz.members).map(async ([uid, role]) => {
-                    const userSnap = await getDoc(doc(db, 'users', uid));
-                    return {
-                        uid,
-                        role,
-                        profile: userSnap.exists() ? (userSnap.data() as User) : undefined
-                    };
+                Object.entries(membersObj).map(async ([uid, role]) => {
+                    try {
+                        const userSnap = await getDoc(doc(db, 'users', uid));
+                        return {
+                            uid,
+                            role,
+                            profile: userSnap.exists() ? (userSnap.data() as User) : undefined
+                        };
+                    } catch (e) {
+                        return { uid, role, profile: undefined };
+                    }
                 })
             );
             setMembers(memberList);

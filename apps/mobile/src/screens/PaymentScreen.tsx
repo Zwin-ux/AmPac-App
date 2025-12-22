@@ -13,6 +13,7 @@ export default function PaymentScreen({ navigation }: any) {
     const [paymentIntents, setPaymentIntents] = useState<any[]>([]);
     const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
     const [creatingPayment, setCreatingPayment] = useState(false);
+    const [isOffline, setIsOffline] = useState(false);
 
     useEffect(() => {
         const loadData = async () => {
@@ -31,14 +32,18 @@ export default function PaymentScreen({ navigation }: any) {
                     { user_id: user.uid }
                 );
                 setCustomer(customerData);
+                setIsOffline(customerData.mock === true);
 
-                // Load payment history
-                const intents = await stripeService.listPaymentIntents(customerData.id);
-                setPaymentIntents(intents);
+                // Load payment history (empty for offline)
+                if (!customerData.mock) {
+                    const intents = await stripeService.listPaymentIntents(customerData.id);
+                    setPaymentIntents(intents);
+                }
 
             } catch (error) {
                 console.error('Error loading payment data:', error);
-                Alert.alert("Error", "Failed to load payment data.");
+                // Don't show error for offline mode - just set offline state
+                setIsOffline(true);
             } finally {
                 setLoading(false);
             }
@@ -48,17 +53,18 @@ export default function PaymentScreen({ navigation }: any) {
     }, []);
 
     const handleCreatePayment = async () => {
+        if (isOffline || customer?.mock) {
+            Alert.alert(
+                "Offline Mode",
+                "Payment processing is unavailable. Please ensure the Brain API is running and try again.",
+                [{ text: "OK" }]
+            );
+            return;
+        }
+
         try {
             setCreatingPayment(true);
             
-            // Create a payment intent for $100 (10000 cents)
-            const paymentIntent = await stripeService.createPaymentIntent(
-                customer.id,
-                10000, // $100.00 in cents
-                'usd',
-                { description: 'AmPac Service Payment' }
-            );
-
             // Create a checkout session
             const session = await stripeService.createCheckoutSession(
                 'price_123', // This would be a real price ID in production
@@ -69,9 +75,9 @@ export default function PaymentScreen({ navigation }: any) {
 
             setCheckoutUrl(session.url);
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error creating payment:', error);
-            Alert.alert("Error", "Failed to create payment.");
+            Alert.alert("Error", error.message || "Failed to create payment.");
         } finally {
             setCreatingPayment(false);
         }
@@ -145,6 +151,19 @@ export default function PaymentScreen({ navigation }: any) {
                     <Text style={styles.subtitle}>Manage your payments and subscriptions</Text>
                 </View>
 
+                {/* Offline Mode Banner */}
+                {isOffline && (
+                    <View style={styles.offlineBanner}>
+                        <Ionicons name="cloud-offline" size={20} color="#D97706" />
+                        <View style={{ flex: 1, marginLeft: 12 }}>
+                            <Text style={styles.offlineBannerTitle}>Offline Mode</Text>
+                            <Text style={styles.offlineBannerText}>
+                                Payment services unavailable. Some features are limited.
+                            </Text>
+                        </View>
+                    </View>
+                )}
+
                 <View style={styles.card}>
                     <Text style={styles.sectionTitle}>Customer Information</Text>
                     <View style={styles.infoRow}>
@@ -155,15 +174,22 @@ export default function PaymentScreen({ navigation }: any) {
                         <Text style={styles.infoLabel}>Email:</Text>
                         <Text style={styles.infoValue}>{customer?.email || 'N/A'}</Text>
                     </View>
-                    <View style={styles.infoRow}>
-                        <Text style={styles.infoLabel}>Customer ID:</Text>
-                        <Text style={styles.infoValue}>{customer?.id || 'N/A'}</Text>
-                    </View>
+                    {!isOffline && (
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Customer ID:</Text>
+                            <Text style={styles.infoValue}>{customer?.id || 'N/A'}</Text>
+                        </View>
+                    )}
                 </View>
 
                 <View style={styles.card}>
                     <Text style={styles.sectionTitle}>Payment History</Text>
-                    {paymentIntents.length > 0 ? (
+                    {isOffline ? (
+                        <View style={styles.emptyState}>
+                            <Ionicons name="cloud-offline-outline" size={40} color="#CBD5E1" />
+                            <Text style={styles.emptyText}>Payment history unavailable offline</Text>
+                        </View>
+                    ) : paymentIntents.length > 0 ? (
                         paymentIntents.map((intent, index) => (
                             <View key={index} style={styles.paymentItem}>
                                 <View style={styles.paymentHeader}>
@@ -186,7 +212,7 @@ export default function PaymentScreen({ navigation }: any) {
                 </View>
 
                 <TouchableOpacity 
-                    style={[styles.button, creatingPayment && { opacity: 0.7 }]}
+                    style={[styles.button, (creatingPayment || isOffline) && { opacity: 0.6 }]}
                     onPress={handleCreatePayment}
                     disabled={creatingPayment}
                 >
@@ -194,8 +220,15 @@ export default function PaymentScreen({ navigation }: any) {
                         <ActivityIndicator color="white" />
                     ) : (
                         <>
-                            <Text style={styles.buttonText}>Make a Payment</Text>
-                            <Ionicons name="card" size={20} color="white" style={{ marginLeft: 8 }} />
+                            <Text style={styles.buttonText}>
+                                {isOffline ? 'Payment Unavailable' : 'Make a Payment'}
+                            </Text>
+                            <Ionicons 
+                                name={isOffline ? 'cloud-offline' : 'card'} 
+                                size={20} 
+                                color="white" 
+                                style={{ marginLeft: 8 }} 
+                            />
                         </>
                     )}
                 </TouchableOpacity>
@@ -250,6 +283,26 @@ const styles = StyleSheet.create({
         color: '#64748B',
         lineHeight: 24
     },
+    offlineBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FEF3C7',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#FCD34D',
+    },
+    offlineBannerTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#92400E',
+        marginBottom: 2,
+    },
+    offlineBannerText: {
+        fontSize: 12,
+        color: '#B45309',
+    },
     card: {
         backgroundColor: 'white',
         borderRadius: 16,
@@ -283,6 +336,10 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#1E293B',
         fontWeight: '600'
+    },
+    emptyState: {
+        alignItems: 'center',
+        paddingVertical: 24,
     },
     paymentItem: {
         padding: 16,

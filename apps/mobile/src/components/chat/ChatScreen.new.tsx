@@ -208,14 +208,14 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ orgId, channelId, channe
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
-                <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                    <Text style={styles.backButtonText}>←</Text>
+                <TouchableOpacity onPress={onBack} style={styles.backButton} accessibilityLabel="Go back" accessibilityRole="button">
+                    <Ionicons name="arrow-back" size={24} color="#007AFF" />
                 </TouchableOpacity>
-                <View>
+                <View style={{ flex: 1 }}>
                     <Text style={styles.headerTitle}>#{channelName}</Text>
                     <Text style={styles.headerSubtitle}>{messages.length} messages</Text>
                 </View>
-                <TouchableOpacity onPress={() => setShowInviteModal(true)} style={{ marginLeft: 'auto' }}>
+                <TouchableOpacity onPress={() => setShowInviteModal(true)} style={styles.headerActionButton} accessibilityLabel="Invite user">
                     <Ionicons name="person-add" size={24} color="#007AFF" />
                 </TouchableOpacity>
             </View>
@@ -313,11 +313,16 @@ const styles = StyleSheet.create({
         borderBottomColor: '#eee',
     },
     backButton: {
-        paddingRight: 16,
+        paddingRight: 12,
+        paddingVertical: 4,
     },
     backButtonText: {
         fontSize: 24,
         color: '#007AFF',
+    },
+    headerActionButton: {
+        paddingLeft: 12,
+        paddingVertical: 4,
     },
     headerTitle: {
         fontSize: 18,

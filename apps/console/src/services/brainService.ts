@@ -1,4 +1,34 @@
-// Mock service for Brain Expansion features
+/**
+ * Brain API Service
+ * Connects to the AmPac Brain FastAPI backend
+ */
+
+const BRAIN_API_URL = import.meta.env.VITE_BRAIN_API_URL || 'http://localhost:8000/api/v1';
+const BRAIN_API_KEY = import.meta.env.VITE_BRAIN_API_KEY;
+
+// Helper for making authenticated API requests
+async function brainFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
+    };
+    
+    if (BRAIN_API_KEY) {
+        (headers as Record<string, string>)['X-API-Key'] = BRAIN_API_KEY;
+    }
+    
+    const response = await fetch(`${BRAIN_API_URL}${endpoint}`, {
+        ...options,
+        headers,
+    });
+    
+    if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Brain API error: ${response.status} - ${error}`);
+    }
+    
+    return response.json();
+}
 
 export interface ExtractionResult {
     extractionId: string;
@@ -20,37 +50,38 @@ export interface KnowledgeResult {
 }
 
 export const brainService = {
+    // Check Brain API health
+    checkHealth: async (): Promise<{ status: string; deps?: any }> => {
+        try {
+            return await brainFetch('/health');
+        } catch {
+            return { status: 'unhealthy' };
+        }
+    },
+
     // 1. IDP: Document Extraction
     extractDocument: async (file: File): Promise<ExtractionResult> => {
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate processing
-
-        // Mock response based on file name
-        if (file.name.toLowerCase().includes('tax')) {
-            return {
-                extractionId: `ext_${Date.now()}`,
-                status: 'completed',
-                confidence: 0.98,
-                data: {
-                    formType: 'IRS 1040',
-                    taxYear: 2023,
-                    taxpayer: 'Rivera Innovations',
-                    adjustedGrossIncome: 150000,
-                    wages: 120000,
-                    businessIncome: 30000,
-                    totalTax: 24000
-                }
-            };
-        } else {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        try {
+            return await brainFetch('/documents/extract', {
+                method: 'POST',
+                headers: {}, // Let browser set Content-Type for FormData
+                body: formData,
+            });
+        } catch {
+            // Fallback to mock if API fails
+            console.warn('Brain API unavailable, using mock extraction');
+            await new Promise(resolve => setTimeout(resolve, 1500));
             return {
                 extractionId: `ext_${Date.now()}`,
                 status: 'completed',
                 confidence: 0.95,
                 data: {
-                    documentType: 'Bank Statement',
-                    period: 'Oct 2023',
-                    totalDeposits: 45000,
-                    endingBalance: 12500,
-                    averageDailyBalance: 8000
+                    documentType: file.name.toLowerCase().includes('tax') ? 'Tax Return' : 'Bank Statement',
+                    extracted: true,
+                    mockData: true,
                 }
             };
         }
@@ -58,51 +89,84 @@ export const brainService = {
 
     // 2. Agents: Trigger Workflow
     triggerAgent: async (agentType: string, context: any): Promise<AgentWorkflow> => {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        return {
-            workflowId: `wf_${Date.now()}`,
-            status: 'started',
-            logs: [`[${new Date().toISOString()}] Agent ${agentType} initialized`, `[${new Date().toISOString()}] Context loaded: ${JSON.stringify(context)}`],
-            estimatedCompletion: new Date(Date.now() + 1000 * 60 * 5).toISOString()
-        };
+        try {
+            return await brainFetch('/agents/trigger', {
+                method: 'POST',
+                body: JSON.stringify({ agentType, context }),
+            });
+        } catch {
+            console.warn('Brain API unavailable, using mock agent');
+            return {
+                workflowId: `wf_${Date.now()}`,
+                status: 'started',
+                logs: [`[${new Date().toISOString()}] Agent ${agentType} initialized (mock)`],
+                estimatedCompletion: new Date(Date.now() + 1000 * 60 * 5).toISOString()
+            };
+        }
     },
 
     // 3. Knowledge: Query
     queryKnowledge: async (query: string): Promise<KnowledgeResult> => {
-        await new Promise(resolve => setTimeout(resolve, 1500));
-
-        if (query.toLowerCase().includes('dscr')) {
+        try {
+            return await brainFetch('/knowledge/query', {
+                method: 'POST',
+                body: JSON.stringify({ query }),
+            });
+        } catch {
+            console.warn('Brain API unavailable, using mock knowledge');
             return {
-                answer: "The minimum **DSCR** for a gas station is generally **1.25x**. However, for SBA 504 loans, a global cash flow analysis is required.",
-                citations: [
-                    { source: "SBA SOP 50 10 7", section: "Chapter 3, Pg 145", text: "Debt Service Coverage Ratio (DSCR) must be..." },
-                    { source: "AmPac Credit Policy", section: "Section 4.2", text: "Gas stations require 1.25x coverage." }
-                ]
+                answer: "I'm currently unable to access the knowledge base. Please try again later.",
+                citations: []
             };
         }
-
-        return {
-            answer: "I found some information related to your query in our internal knowledge base.",
-            citations: [
-                { source: "General Policy", section: "Intro", text: "AmPac aims to support small businesses..." }
-            ]
-        };
     },
 
     // 4. M365: AI Assist
     draftEmail: async (appId: string, intent: 'approve' | 'request_docs' | 'follow_up', tone: string): Promise<{ subject: string; body: string }> => {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        return {
-            subject: `Update regarding Application #${appId}`,
-            body: `Dear Applicant,\n\nThis is a draft email generated by AmPac Brain based on the '${intent}' intent with a '${tone}' tone.\n\nPlease review before sending.\n\nBest,\nAmPac Team`
-        };
+        try {
+            return await brainFetch('/m365/draft-email', {
+                method: 'POST',
+                body: JSON.stringify({ appId, intent, tone }),
+            });
+        } catch {
+            console.warn('Brain API unavailable, using mock email draft');
+            return {
+                subject: `Update regarding Application #${appId}`,
+                body: `Dear Applicant,\n\nThis is a draft email generated locally.\n\nPlease review before sending.\n\nBest,\nAmPac Team`
+            };
+        }
     },
 
-    proposeMeeting: async (_borrowerEmail: string, _staffEmails: string[], _timeWindow: string): Promise<{ slots: string[]; draftBody: string }> => {
-        await new Promise(resolve => setTimeout(resolve, 2500));
-        return {
-            slots: ["2023-10-27T10:00:00Z", "2023-10-27T14:00:00Z"],
-            draftBody: "Hi,\n\nI'd like to propose the following times for a quick sync:\n- Friday 10:00 AM\n- Friday 2:00 PM\n\nLet me know what works."
-        };
+    proposeMeeting: async (borrowerEmail: string, staffEmails: string[], timeWindow: string): Promise<{ slots: string[]; draftBody: string }> => {
+        try {
+            return await brainFetch('/m365/propose-meeting', {
+                method: 'POST',
+                body: JSON.stringify({ borrowerEmail, staffEmails, timeWindow }),
+            });
+        } catch {
+            console.warn('Brain API unavailable, using mock meeting proposal');
+            return {
+                slots: [
+                    new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+                    new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+                ],
+                draftBody: "Hi,\n\nI'd like to propose a meeting.\n\nLet me know what works."
+            };
+        }
+    },
+
+    // Chat with Brain
+    chat: async (message: string, context?: any): Promise<{ response: string; suggestions?: string[] }> => {
+        try {
+            return await brainFetch('/chat', {
+                method: 'POST',
+                body: JSON.stringify({ message, context }),
+            });
+        } catch {
+            return {
+                response: "I'm currently unable to process your request. Please try again later.",
+                suggestions: []
+            };
+        }
     }
 };

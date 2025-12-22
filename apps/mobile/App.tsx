@@ -4,6 +4,10 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+// Initialize Sentry as early as possible
+import { initSentry } from './src/services/sentry';
+initSentry();
+
 // Screens
 import SignInScreen from './src/screens/SignInScreen';
 import SignUpScreen from './src/screens/SignUpScreen';
@@ -28,9 +32,11 @@ import DemographicsScreen from './src/screens/DemographicsScreen';
 import SkillsScreen from './src/screens/SkillsScreen';
 import MarketplaceScreen from './src/screens/MarketplaceScreen';
 import ErrorBoundary from './src/components/ErrorBoundary';
+import LoadingScreen from './src/components/LoadingScreen';
 import { ToastProvider } from './src/context/ToastContext';
 import PreliminaryIntakeScreen from './src/screens/PreliminaryIntakeScreen';
 import BusinessAdminScreen from './src/screens/BusinessAdminScreen';
+import CalendarScreen from './src/screens/CalendarScreen';
 
 // Types
 import { theme } from './src/theme';
@@ -170,7 +176,7 @@ function AppStack() {
   }, [user]);
 
   if (loading) {
-    return null;
+    return <LoadingScreen message="Starting AmPac..." />;
   }
 
   return (
@@ -194,6 +200,7 @@ function AppStack() {
           <Stack.Screen name="Chat" component={ChatScreenWrapper} />
           <Stack.Screen name="Profile" component={ProfileScreen} />
           <Stack.Screen name="BusinessAdmin" component={BusinessAdminScreen} />
+          <Stack.Screen name="Calendar" component={CalendarScreen} />
         </>
       ) : (
         <>
@@ -209,10 +216,14 @@ function AppStack() {
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <NavigationContainer>
-        <AppStack />
-      </NavigationContainer>
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <ToastProvider>
+          <NavigationContainer>
+            <AppStack />
+          </NavigationContainer>
+        </ToastProvider>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }

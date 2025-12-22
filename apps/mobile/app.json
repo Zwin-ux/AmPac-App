@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "AmPac Mobile",
-    "slug": "ampac-mobile",
+    "name": "AmPac Capital",
+    "slug": "ampac-business-capital",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -15,14 +15,15 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ampac.app",
+      "bundleIdentifier": "com.ampac.borrower",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "This app uses the photo library to let you upload profile pictures and share images in chat.",
-        "NSCameraUsageDescription": "This app uses the camera to let you take profile pictures and share photos in chat."
+        "NSCameraUsageDescription": "This app uses the camera to let you take profile pictures and share photos in chat.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.ampac.app",
+      "package": "com.ampac.borrower",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -42,9 +43,21 @@
       "graphUseProxy": true,
       "graphScopes": [
         "Calendars.ReadWrite",
+        "offline_access",
+        "Calendars.ReadWrite",
         "offline_access"
       ],
-      "scheme": "ampac"
+      "scheme": "ampac",
+      "eas": {
+        "projectId": "d4d70bfc-70cd-4a73-a5c2-bd56d33b2474"
+      }
+    },
+    "owner": "ampac",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/d4d70bfc-70cd-4a73-a5c2-bd56d33b2474"
     }
   }
 }

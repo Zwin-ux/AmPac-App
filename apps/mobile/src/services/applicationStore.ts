@@ -4,6 +4,7 @@ import { getAuth } from 'firebase/auth';
 import { Application, ApplicationType, SyncStatus, QuickApplyData } from '../types';
 import { getApplication, saveApplication } from './applications';
 import { app } from '../../firebaseConfig';
+import { getCurrentUserId } from './authUtils';
 
 const DRAFT_STORAGE_KEY = 'app_draft_v1';
 const SAVE_DEBOUNCE_MS = 800;
@@ -92,8 +93,12 @@ class ApplicationStore {
     }
 
     async syncWithServer(): Promise<Application | null> {
-        const auth = getAuth(app);
-        const userId = auth.currentUser?.uid || 'dev-user';
+        const userId = getCurrentUserId();
+        
+        if (!userId) {
+            this.setState({ syncStatus: 'idle' });
+            return null;
+        }
 
         this.setState({ syncStatus: 'syncing' });
         logStoreEvent('syncWithServer.start', { userId });
@@ -170,8 +175,8 @@ class ApplicationStore {
     // ============ CREATE NEW DRAFT (instant local, async server) ============
 
     createDraft(type: ApplicationType, prefill?: Partial<Application>): Application {
-        const auth = getAuth(app);
-        const userId = auth.currentUser?.uid || 'dev-user';
+        const userId = getCurrentUserId();
+        if (!userId) throw new Error("User not authenticated");
         const now = Timestamp.now();
 
         const draft: Application = {
@@ -200,8 +205,8 @@ class ApplicationStore {
     }
 
     createQuickDraft(data: QuickApplyData): Application {
-        const auth = getAuth(app);
-        const userId = auth.currentUser?.uid || 'dev-user';
+        const userId = getCurrentUserId();
+        if (!userId) throw new Error("User not authenticated");
         const now = Timestamp.now();
 
         const draft: Application = {
@@ -347,3 +352,6 @@ class ApplicationStore {
 
 // Singleton instance
 export const applicationStore = new ApplicationStore();
+
+// Export class for testing
+export { ApplicationStore };

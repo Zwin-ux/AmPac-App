@@ -130,15 +130,34 @@ export default function HotlineScreen() {
 
     const openUrl = async (url: string) => {
         try {
+            // Try to open the URL directly first
             const supported = await Linking.canOpenURL(url);
-            if (!supported) {
-                Alert.alert('Error', 'Cannot open this link on your device.');
+            if (supported) {
+                await Linking.openURL(url);
                 return;
             }
-            await Linking.openURL(url);
+            
+            // If not supported, try with different URL schemes
+            const webUrl = url.startsWith('http') ? url : `https://${url}`;
+            const webSupported = await Linking.canOpenURL(webUrl);
+            if (webSupported) {
+                await Linking.openURL(webUrl);
+                return;
+            }
+            
+            // Final fallback - show message
+            Alert.alert(
+                'Cannot Open Link',
+                `Your device cannot open this link directly.\n\nURL: ${url}`,
+                [{ text: 'OK' }]
+            );
         } catch (err) {
             console.error('Failed to open URL', url, err);
-            Alert.alert('Error', 'Could not open the link. Please try again.');
+            Alert.alert(
+                'Error Opening Link',
+                'Could not open the link. Please try again later.',
+                [{ text: 'OK' }]
+            );
         }
     };
 

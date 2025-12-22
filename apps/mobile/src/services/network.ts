@@ -29,31 +29,26 @@ export const getBusinesses = async (forceRefresh = false): Promise<Business[]> =
         const fetchedBusinesses: Business[] = [];
         querySnapshot.forEach((doc) => {
             const data = doc.data();
-            if (data.businessName) {
+            // Support both 'name' (new) and 'businessName' (legacy)
+            const name = data.name || data.businessName;
+            if (name) {
                 fetchedBusinesses.push({
                     id: doc.id,
-                    name: data.businessName,
+                    ownerId: data.ownerId || doc.id,
+                    name: name,
                     industry: data.industry || 'General',
-                    description: data.description || 'No description available.',
+                    description: data.description || data.bio || 'No description available.',
                     city: data.city || 'Inland Empire',
-                    ownerName: data.fullName
+                    ownerName: data.ownerName || data.fullName || 'AmPac Member',
+                    members: data.members || {},
                 });
             }
         });
 
-        if (fetchedBusinesses.length === 0) {
-            businessCache = [
-                { id: '1', name: 'Inland Empire Coffee', industry: 'Food & Bev', description: 'Artisan coffee roaster.', city: 'Riverside', ownerName: 'Jane Doe' },
-                { id: '2', name: 'Tech Solutions Inc.', industry: 'Technology', description: 'Custom software development.', city: 'Ontario', ownerName: 'John Smith' },
-                { id: '3', name: 'Green Thumb Landscaping', industry: 'Services', description: 'Commercial landscaping.', city: 'San Bernardino', ownerName: 'Mike Johnson' },
-                { id: '4', name: 'Creative Design Studio', industry: 'Design', description: 'Branding and web design.', city: 'Redlands', ownerName: 'Sarah Lee' },
-            ];
-        } else {
-            businessCache = fetchedBusinesses;
-        }
+        businessCache = fetchedBusinesses;
 
         await cacheService.set(CACHE_KEY_BUSINESSES, businessCache);
-        return businessCache;
+        return businessCache ?? [];
     } catch (error) {
         console.error("Error fetching businesses:", error);
         return [];

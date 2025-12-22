@@ -17,6 +17,7 @@ import {
     increment
 } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
+import { getCurrentUserId, getCurrentDisplayName } from './authUtils';
 
 export interface Comment {
     id: string;
@@ -45,28 +46,41 @@ export const commentService = {
      */
     addComment: async (postId: string, content: string, parentCommentId?: string): Promise<string> => {
         try {
-            const user = auth.currentUser;
-            if (!user) throw new Error("User not authenticated");
+            const uid = getCurrentUserId();
+            if (!uid) throw new Error("User not authenticated");
+            const displayName = getCurrentDisplayName();
 
             // Fetch user profile to get badges
-            const userSnap = await getDoc(doc(db, 'users', user.uid));
-            const userData = userSnap.exists() ? userSnap.data() : {};
-            const badges = userData.badges || [];
+            let badges: string[] = [];
+            const user = auth.currentUser;
+            if (user) {
+                const userSnap = await getDoc(doc(db, 'users', user.uid));
+                const userData = userSnap.exists() ? userSnap.data() : {};
+                badges = userData.badges || [];
+            } else if (uid === 'dev-user') {
+                badges = ['Developer'];
+            }
 
-            const newComment: Partial<Comment> = {
+            const newComment: any = {
                 postId,
-                authorId: user.uid,
-                authorName: user.displayName || 'AmPac User',
-                ...(user.photoURL && { authorAvatar: user.photoURL }), // Only include if exists
+                authorId: uid,
+                authorName: displayName,
                 authorBadges: badges,
                 content,
                 likes: [],
-                ...(parentCommentId && { parentCommentId }), // Only include if replying
                 replyCount: 0,
                 isHelpful: false,
                 isEdited: false,
-                createdAt: serverTimestamp() as any
+                createdAt: serverTimestamp()
             };
+
+            if (user?.photoURL) {
+                newComment.authorAvatar = user.photoURL;
+            }
+
+            if (parentCommentId) {
+                newComment.parentCommentId = parentCommentId;
+            }
 
             const docRef = await addDoc(collection(db, 'comments'), newComment);
 

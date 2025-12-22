@@ -14,6 +14,23 @@ const firebaseConfig = {
     measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
+// Validate required configuration
+if (!firebaseConfig.apiKey) {
+    console.error("Firebase Config Error: Missing API Key. Check your .env file.");
+    throw new Error("Firebase Configuration Missing: VITE_FIREBASE_API_KEY is undefined. See .env.example");
+}
+
+if (!firebaseConfig.projectId) {
+    console.error("Firebase Config Error: Missing Project ID. Check your .env file.");
+    throw new Error("Firebase Configuration Missing: VITE_FIREBASE_PROJECT_ID is undefined. See .env.example");
+}
+
+console.log("Firebase Config Loaded:", {
+    apiKey: "***" + firebaseConfig.apiKey?.slice(-4),
+    projectId: firebaseConfig.projectId,
+    authDomain: firebaseConfig.authDomain,
+});
+
 import { getMessaging } from "firebase/messaging";
 
 const app = initializeApp(firebaseConfig);

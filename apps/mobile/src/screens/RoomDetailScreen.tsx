@@ -6,6 +6,7 @@ import { theme } from '../theme';
 import { Room, Booking } from '../types';
 import { createBooking } from '../services/rooms';
 import { auth } from '../../firebaseConfig';
+import { getCurrentUserId } from '../services/authUtils';
 import { Timestamp } from 'firebase/firestore';
 import { pricingService } from '../services/pricing';
 import { graphCalendarService } from '../services/microsoftGraph';
@@ -41,7 +42,8 @@ export default function RoomDetailScreen() {
     const handleBookNow = async () => {
         setLoading(true);
         try {
-            const userId = auth.currentUser ? auth.currentUser.uid : 'dev-user';
+            const userId = getCurrentUserId();
+            if (!userId) throw new Error("User not authenticated");
 
             const availability = await availabilityService.checkItemsAvailability([{
                 roomId: room.id,

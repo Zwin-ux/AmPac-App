@@ -11,7 +11,7 @@ import {
     onSnapshot,
     Unsubscribe
 } from 'firebase/firestore';
-import { db } from '../../firebaseConfig';
+import { db, auth } from '../../firebaseConfig';
 import { Application, ApplicationType } from '../types';
 import { cacheService } from './cache';
 import { API_URL } from '../config';
@@ -74,6 +74,11 @@ export const getApplication = async (userId: string): Promise<Application | null
     }
 
     // 3. Try Firestore
+    // In development: avoid running Firestore queries for the legacy 'dev-user' when no auth is present
+    if (__DEV__ && userId === 'dev-user' && !auth.currentUser) {
+        console.log('[Applications] Skipping Firestore query for dev-user in dev mode');
+        return null;
+    }
     try {
         const appsCol = collection(db, 'applications');
         const q = query(
@@ -245,6 +250,12 @@ export const subscribeToApplications = (userId: string, onUpdate: (apps: Applica
         where('userId', '==', userId),
         orderBy('createdAt', 'desc')
     );
+
+    // If running in development against the demo 'dev-user' without an authenticated user, return empty results.
+    if (__DEV__ && userId === 'dev-user' && !auth.currentUser) {
+        setTimeout(() => onUpdate([]), 0);
+        return () => {};
+    }
 
     return onSnapshot(q, (snapshot) => {
         const apps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Application));

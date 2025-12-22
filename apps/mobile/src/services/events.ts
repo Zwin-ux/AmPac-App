@@ -13,6 +13,7 @@ import {
     where
 } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
+import { getCurrentUserId, getCurrentDisplayName } from './authUtils';
 import { Event } from '../types';
 import { notificationService } from './notificationService';
 import { getDoc } from 'firebase/firestore';
@@ -34,25 +35,34 @@ export const getEvents = async (): Promise<Event[]> => {
 
 export const createEvent = async (event: Omit<Event, 'id' | 'attendees' | 'engagementScore' | 'organizerId' | 'organizerName'>): Promise<string> => {
     try {
-        const user = auth.currentUser;
-        if (!user) throw new Error("Authentication required");
+        const uid = getCurrentUserId();
+        if (!uid) throw new Error("User not authenticated");
+        const displayName = getCurrentDisplayName();
 
         const eventsRef = collection(db, 'events');
         // Fetch user profile for badges
-        const userSnap = await getDoc(doc(db, 'users', user.uid));
-        const userData = userSnap.exists() ? userSnap.data() as any : {};
-        const badges = userData.badges || [];
+        let badges: string[] = [];
+        const user = auth.currentUser;
+        if (user) {
+            const userSnap = await getDoc(doc(db, 'users', user.uid));
+            const userData = userSnap.exists() ? userSnap.data() as any : {};
+            badges = userData.badges || [];
+        } else if (uid === 'dev-user') {
+            badges = ['Developer'];
+        }
 
-        const newEvent = {
+        const newEvent: any = {
             ...event,
-            organizerId: user.uid,
-            organizerName: user.displayName || 'AmPac User',
-            organizerAvatar: user.photoURL || undefined,
+            organizerId: uid,
+            organizerName: displayName,
             organizerBadges: badges,
             attendees: [],
-            engagementScore: 0,
             createdAt: serverTimestamp()
         };
+
+        if (user?.photoURL) {
+            newEvent.organizerAvatar = user.photoURL;
+        }
 
         const docRef = await addDoc(eventsRef, newEvent);
         return docRef.id;
@@ -64,12 +74,13 @@ export const createEvent = async (event: Omit<Event, 'id' | 'attendees' | 'engag
 
 export const toggleRSVP = async (eventId: string, isJoining: boolean) => {
     try {
-        const user = auth.currentUser;
-        if (!user) return;
+        const uid = getCurrentUserId();
+        if (!uid) throw new Error("User not authenticated");
+        const displayName = getCurrentDisplayName();
 
         const eventRef = doc(db, 'events', eventId);
         await updateDoc(eventRef, {
-            attendees: isJoining ? arrayUnion(user.uid) : arrayRemove(user.uid),
+            attendees: isJoining ? arrayUnion(uid) : arrayRemove(uid),
             engagementScore: isJoining ? serverTimestamp() : serverTimestamp()
         });
 
@@ -79,12 +90,12 @@ export const toggleRSVP = async (eventId: string, isJoining: boolean) => {
             if (eventSnap.exists()) {
                 const eventData = eventSnap.data() as Event;
                 // Don't notify if self-RSVP
-                if (eventData.organizerId !== user.uid) {
+                if (eventData.organizerId !== uid) {
                     await notificationService.sendRSVPNotification(
                         eventData.organizerId,
                         eventData.title,
                         eventId,
-                        user.displayName || 'A user'
+                        displayName
                     );
                 }
             }

@@ -17,6 +17,7 @@ import { db, auth } from '../../firebaseConfig';
 import { Channel, Message } from '../types';
 import { API_URL } from '../config';
 import { getFirebaseIdToken } from './brainAuth';
+import { getCurrentUserId, getCurrentDisplayName } from './authUtils';
 
 export const chatService = {
     /**
@@ -69,24 +70,57 @@ export const chatService = {
         mediaUrl?: string
     ): Promise<string> => {
         try {
+            let uid = getCurrentUserId();
+
+            // If no authenticated user in dev mode, attempt anonymous sign-in so chat can use a real auth context
+            if (!auth.currentUser && __DEV__) {
+                try {
+                    const { signInAnonymously } = await import('firebase/auth');
+                    const cred = await signInAnonymously(auth);
+                    // Create lightweight user doc for dev use
+                    const anonUid = cred.user?.uid;
+                    if (anonUid) {
+                        const { setDoc, doc: firestoreDoc } = await import('firebase/firestore');
+                        await setDoc(firestoreDoc(db, 'users', anonUid), {
+                            uid: anonUid,
+                            role: 'entrepreneur',
+                            fullName: 'AmPac Dev User',
+                            businessName: 'Dev Business Inc.',
+                            createdAt: serverTimestamp()
+                        }, { merge: true });
+                        uid = anonUid;
+                    }
+                } catch (e) {
+                    console.warn('Anonymous sign-in for chat failed:', e);
+                }
+            }
+
+            if (!uid) throw new Error("User not authenticated");
+
             const user = auth.currentUser;
-            if (!user) throw new Error("User not authenticated");
+            const displayName = getCurrentDisplayName();
 
             const messagesRef = collection(db, 'organizations', orgId, 'channels', channelId, 'messages');
 
             // Create message payload
-            const messageData: Partial<Message> = {
+            const messageData: any = {
                 channelId,
                 text,
-                senderId: user.uid,
-                senderName: user.displayName || 'Unknown User',
-                senderAvatar: user.photoURL || undefined,
+                senderId: uid,
+                senderName: displayName,
                 type,
-                mediaUrl,
                 reactions: {},
                 replyCount: 0,
-                createdAt: serverTimestamp() as any, // Cast for local vs server diffs
+                createdAt: serverTimestamp(),
             };
+
+            if (user?.photoURL) {
+                messageData.senderAvatar = user.photoURL;
+            }
+
+            if (mediaUrl) {
+                messageData.mediaUrl = mediaUrl;
+            }
 
             const docRef = await addDoc(messagesRef, messageData);
 
@@ -95,7 +129,7 @@ export const chatService = {
             await updateDoc(channelRef, {
                 lastMessage: {
                     text: type === 'image' ? '📷 Image' : text,
-                    senderId: user.uid,
+                    senderId: uid,
                     createdAt: serverTimestamp()
                 }
             });
@@ -109,8 +143,8 @@ export const chatService = {
 
     createChannel: async (orgId: string, name: string, type: 'public' | 'private' = 'public', description?: string): Promise<string> => {
         try {
-            const user = auth.currentUser;
-            if (!user) throw new Error("User not authenticated");
+            const uid = getCurrentUserId();
+            if (!uid) throw new Error("User not authenticated");
 
             const channelsRef = collection(db, 'organizations', orgId, 'channels');
             const data: Partial<Channel> = {
@@ -118,9 +152,14 @@ export const chatService = {
                 name,
                 type,
                 description,
-                members: [user.uid],
+                members: [uid],
                 createdAt: serverTimestamp() as any,
-                createdBy: user.uid
+                createdBy: uid,
+                lastMessage: {
+                    text: 'Channel created',
+                    senderId: uid,
+                    createdAt: serverTimestamp() as any
+                }
             };
             const docRef = await addDoc(channelsRef, data);
             return docRef.id;

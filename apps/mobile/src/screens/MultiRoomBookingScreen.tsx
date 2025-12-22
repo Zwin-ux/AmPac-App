@@ -10,6 +10,7 @@ import { pricingService } from '../services/pricing';
 import { createBooking } from '../services/rooms';
 import { graphCalendarService } from '../services/microsoftGraph';
 import { auth } from '../../firebaseConfig';
+import { getCurrentUserId } from '../services/authUtils';
 import { theme } from '../theme';
 import { availabilityService } from '../services/availability';
 
@@ -45,7 +46,8 @@ export default function MultiRoomBookingScreen() {
 
         setLoading(true);
         try {
-            const userId = auth.currentUser ? auth.currentUser.uid : 'dev-user';
+            const userId = getCurrentUserId();
+            if (!userId) throw new Error("User not authenticated");
 
             const itemsToCheck = rooms.map(room => ({
                 roomId: room.id,

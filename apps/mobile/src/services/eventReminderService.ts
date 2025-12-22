@@ -9,6 +9,8 @@ Notifications.setNotificationHandler({
         shouldShowAlert: true,
         shouldPlaySound: true,
         shouldSetBadge: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
     }),
 });
 
@@ -89,7 +91,7 @@ export const eventReminderService = {
                         data: { eventId, type: '24h', userId },
                         sound: true,
                     },
-                    trigger: { date: reminder24h },
+                    trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: reminder24h },
                 });
                 scheduledIds.push(id);
             }
@@ -104,7 +106,7 @@ export const eventReminderService = {
                         data: { eventId, type: '1h', userId },
                         sound: true,
                     },
-                    trigger: { date: reminder1h },
+                    trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: reminder1h },
                 });
                 scheduledIds.push(id);
             }
@@ -118,7 +120,7 @@ export const eventReminderService = {
                         data: { eventId, type: 'now', userId },
                         sound: true,
                     },
-                    trigger: { date: eventDate },
+                    trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: eventDate },
                 });
                 scheduledIds.push(id);
             }

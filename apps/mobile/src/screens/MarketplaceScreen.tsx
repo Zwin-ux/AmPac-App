@@ -49,7 +49,11 @@ export default function MarketplaceScreen({ navigation }: any) {
 
     const featured = useMemo(() => filtered.filter((i) => i.featured), [filtered]);
 
-    const openUrl = async (url: string) => {
+    const openUrl = async (url: string | undefined) => {
+        if (!url) {
+            Alert.alert('Info', 'No link available for this item.');
+            return;
+        }
         try {
             const supported = await Linking.canOpenURL(url);
             if (!supported) {

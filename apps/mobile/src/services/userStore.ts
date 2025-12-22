@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Timestamp } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
+import { getAuth, signInAnonymously } from 'firebase/auth';
 import { User } from '../types';
 import { getCurrentUserDoc } from './firestore';
 import { app } from '../../firebaseConfig';
@@ -73,19 +73,43 @@ class UserStore {
             const auth = getAuth(app);
             const uid = auth.currentUser?.uid;
             if (!uid) {
-                // Dev mode fallback
-                const devUser: User = {
-                    uid: 'dev-user',
-                    role: 'entrepreneur',
-                    fullName: 'Test Entrepreneur',
-                    businessName: 'Dev Business Inc.',
-                    phone: '555-0123',
-                    createdAt: Timestamp.now(),
-                };
-                this.user = devUser;
-                await this.persistToStorage(devUser);
-                this.notify();
-                return devUser;
+                // Dev mode: attempt anonymous sign-in so Firestore rules see a real auth user
+                if (__DEV__) {
+                    try {
+                        const authInst = getAuth(app);
+                        const signInResult = await signInAnonymously(authInst);
+                        const anonUid = authInst.currentUser?.uid;
+                        if (anonUid) {
+                            // Create a lightweight dev user doc to satisfy rules that check users collection
+                            const { setDoc, doc } = await import('firebase/firestore');
+                            const { db } = await import('../../firebaseConfig');
+                            const devDoc = doc(db, 'users', anonUid);
+                            await setDoc(devDoc, {
+                                uid: anonUid,
+                                role: 'entrepreneur',
+                                fullName: 'AmPac Dev User',
+                                businessName: 'Dev Business Inc.',
+                                createdAt: Timestamp.now(),
+                            }, { merge: true });
+
+                            const devUser: User = {
+                                uid: anonUid,
+                                role: 'entrepreneur',
+                                fullName: 'AmPac Dev User',
+                                businessName: 'Dev Business Inc.',
+                                phone: '555-0123',
+                                createdAt: Timestamp.now(),
+                            };
+                            this.user = devUser;
+                            await this.persistToStorage(devUser);
+                            this.notify();
+                            return devUser;
+                        }
+                    } catch (e) {
+                        console.warn('Anonymous sign-in failed:', e);
+                    }
+                }
+                return null;
             }
 
             const serverUser = await getCurrentUserDoc(uid);

@@ -9,6 +9,7 @@ import {
     setDoc
 } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
+import { getCurrentUserId } from './authUtils';
 
 export interface Report {
     id?: string;
@@ -29,12 +30,12 @@ export const reportService = {
         targetType: 'message' | 'post' | 'user', 
         reason: string
     ) => {
-        const user = auth.currentUser;
-        if (!user) throw new Error("Must be logged in to report.");
+        const uid = getCurrentUserId();
+        if (!uid) throw new Error("User not authenticated");
 
         try {
             await addDoc(collection(db, 'reports'), {
-                reporterId: user.uid,
+                reporterId: uid,
                 targetId,
                 targetType,
                 reason,

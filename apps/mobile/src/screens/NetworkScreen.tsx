@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, ScrollView, Modal, Alert, Linking } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Timestamp } from 'firebase/firestore';
 import { theme } from '../theme';
 import { Business, Event, FeedPost } from '../types';
 import { getBusinesses } from '../services/network';
@@ -93,15 +94,15 @@ export default function NetworkScreen() {
 
         setCreatingEvent(true);
         try {
-            const created = await createEvent({
+            const eventId = await createEvent({
                 title: newEvent.title,
                 description: newEvent.description,
                 location: newEvent.location,
-                date: new Date().toISOString(), // Default to now for demo
-                organizerId: 'current_user',
-                organizerName: 'You'
+                date: Timestamp.now(), // Default to now
             });
-            setEvents([...events, created]);
+            // Refresh events list
+            const refreshedEvents = await getEvents();
+            setEvents(refreshedEvents);
             setShowCreateEventModal(false);
             setNewEvent({ title: '', description: '', location: '', date: '' });
             Alert.alert('Success', 'Event created successfully!');
@@ -180,7 +181,7 @@ export default function NetworkScreen() {
             <View style={styles.cardContent}>
                 <Text style={styles.businessName}>{item.title}</Text>
                 <Text style={styles.industry}>
-                    {new Date(item.date).toLocaleDateString()} • {item.location}
+                    {item.date?.toDate?.().toLocaleDateString() || 'TBD'} • {item.location}
                 </Text>
                 <Text style={styles.description} numberOfLines={2}>{item.description}</Text>
                 <View style={styles.eventFooter}>

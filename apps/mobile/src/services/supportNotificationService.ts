@@ -29,24 +29,31 @@ export const supportNotificationService = {
                 return;
             }
 
-            const notification: Omit<SupportNotification, 'id'> = {
+            // Build notification object, excluding undefined fields
+            const notification: Record<string, any> = {
                 type: data.type,
                 userId: user.uid,
                 userName: user.displayName || 'AmPac User',
                 userEmail: user.email || 'unknown@email.com',
-                denialReason: data.denialReason,
-                message: data.message,
                 timestamp: Timestamp.now(),
                 read: false,
                 supportEmail: 'help_support@ampac.com'
             };
+
+            // Only add optional fields if they have values
+            if (data.denialReason) {
+                notification.denialReason = data.denialReason;
+            }
+            if (data.message) {
+                notification.message = data.message;
+            }
 
             await addDoc(collection(db, 'support_notifications'), notification);
 
             console.log('✅ Support notification sent:', data.type);
         } catch (error) {
             console.error('❌ Error sending support notification:', error);
-            throw error;
+            // Don't throw - support notifications are non-critical
         }
     },
 
@@ -102,10 +109,23 @@ export const supportNotificationService = {
             }
 
             const snapshot = await getDocs(q);
-            return snapshot.docs.map(doc => ({
-                ...doc.data(),
-                id: doc.id
-            } as SupportNotification));
+            return snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    type: data.type,
+                    userId: data.userId,
+                    userName: data.userName,
+                    userEmail: data.userEmail,
+                    supportEmail: data.supportEmail || 'support@ampac.com',
+                    message: data.message,
+                    timestamp: data.timestamp,
+                    read: data.read,
+                    priority: data.priority,
+                    metadata: data.metadata,
+                    denialReason: data.denialReason,
+                } as SupportNotification;
+            });
         } catch (error) {
             console.error('Error fetching support notifications:', error);
             return [];

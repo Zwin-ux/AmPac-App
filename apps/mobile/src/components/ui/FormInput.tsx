@@ -5,18 +5,56 @@ import { theme } from '../../theme';
 interface FormInputProps extends TextInputProps {
     label: string;
     error?: string;
+    hint?: string;
+    testID?: string;
 }
 
-export const FormInput: React.FC<FormInputProps> = ({ label, error, style, ...props }) => {
+export const FormInput: React.FC<FormInputProps> = ({ 
+    label, 
+    error, 
+    hint,
+    style, 
+    testID,
+    ...props 
+}) => {
+    const inputId = `input-${label.replace(/\s+/g, '-').toLowerCase()}`;
+    
     return (
         <View style={styles.container}>
-            <Text style={styles.label}>{label}</Text>
+            <Text 
+                style={styles.label}
+                accessibilityRole="text"
+                nativeID={`${inputId}-label`}
+            >
+                {label}
+            </Text>
             <TextInput
                 style={[styles.input, error && styles.inputError, style]}
                 placeholderTextColor={theme.colors.textSecondary}
+                accessible={true}
+                accessibilityLabel={label}
+                accessibilityHint={hint || props.placeholder}
+                accessibilityLabelledBy={`${inputId}-label`}
+                accessibilityState={{
+                    disabled: props.editable === false,
+                }}
+                testID={testID || inputId}
                 {...props}
             />
-            {error && <Text style={styles.errorText}>{error}</Text>}
+            {hint && !error && (
+                <Text style={styles.hintText} accessibilityRole="text">
+                    {hint}
+                </Text>
+            )}
+            {error && (
+                <Text 
+                    style={styles.errorText} 
+                    accessibilityRole="alert"
+                    accessibilityLiveRegion="assertive"
+                >
+                    {error}
+                </Text>
+            )}
         </View>
     );
 };
@@ -46,6 +84,11 @@ const styles = StyleSheet.create({
     },
     inputError: {
         borderColor: theme.colors.error,
+    },
+    hintText: {
+        fontSize: 11,
+        color: theme.colors.textSecondary,
+        marginTop: 4,
     },
     errorText: {
         fontSize: 11,

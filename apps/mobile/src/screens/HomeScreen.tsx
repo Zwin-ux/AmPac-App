@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View, TouchableOpacity, Linking } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,10 +12,13 @@ import { User, Application } from '../types';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { LoanStatusTracker } from '../components/LoanStatusTracker';
+import { globalCalendarService, GlobalEvent } from '../services/globalCalendarService';
+import { format } from 'date-fns';
 
 export default function HomeScreen() {
     const [user, setUser] = useState<User | null>(() => userStore.getCachedUser());
     const [activeApplication, setActiveApplication] = useState<Application | null>(null);
+    const [upcomingEvents, setUpcomingEvents] = useState<GlobalEvent[]>([]);
     const navigation = useNavigation<any>();
 
     // 1. Subscription & Hydration (Run once)
@@ -27,6 +30,10 @@ export default function HomeScreen() {
             userStore.syncWithServer();
             await applicationStore.hydrateFromStorage();
             applicationStore.syncWithServer();
+            
+            // Load featured events
+            const events = await globalCalendarService.getFeaturedEvents(3);
+            setUpcomingEvents(events);
         };
         hydrate();
 
@@ -61,11 +68,11 @@ export default function HomeScreen() {
     const userName = user?.fullName?.split(' ')[0] || 'Entrepreneur';
     const tools = [
         { label: 'Support & Concierge', icon: 'chatbox-ellipses', color: '#1565C0', background: '#E3F2FD', screen: 'Support' },
-        { label: 'Book Space', icon: 'calendar', color: '#2E7D32', background: '#E8F5E9', screen: 'Spaces' },
+        { label: 'Book Space', icon: 'business', color: '#2E7D32', background: '#E8F5E9', screen: 'Spaces' },
+        { label: 'My Calendar', icon: 'calendar', color: '#6366F1', background: '#EEF2FF', screen: 'Calendar' },
         { label: 'Payments', icon: 'card', color: '#1565C0', background: '#E3F2FD', screen: 'Payment' },
         { label: 'Marketplace', icon: 'bag-handle', color: '#1F2937', background: '#F3F4F6', screen: 'Marketplace' },
         { label: 'Communities', icon: 'people-circle', color: '#E65100', background: '#FFF3E0', screen: 'Social' },
-        { label: 'Businesses', icon: 'people', color: '#7B1FA2', background: '#F3E5F5', screen: 'Network' },
     ];
 
     return (
@@ -114,44 +121,80 @@ export default function HomeScreen() {
                         </View>
                     </Card>
                 ) : (
+                    /* Combined Get Started Card - Apply + Eligibility */
                     <Card style={styles.startAppCard}>
                         <View style={styles.startAppContent}>
                             <View style={styles.startAppText}>
                                 <Text style={styles.startAppTitle}>Get Funded</Text>
-                                <Text style={styles.startAppDesc}>Start your SBA 504 or Community Loan application in minutes.</Text>
+                                <Text style={styles.startAppDesc}>Apply for SBA 504 or Community Loans to grow your business.</Text>
                             </View>
                             <Ionicons name="rocket" size={48} color="rgba(255,255,255,0.2)" />
                         </View>
-                        <Button
-                            title="Start Application"
-                            onPress={() => navigation.navigate('Apply')}
-                            style={{ backgroundColor: 'white' }}
-                            textStyle={{ color: theme.colors.primary, fontWeight: 'bold' }}
-                        />
+                        <View style={styles.startAppButtons}>
+                            <TouchableOpacity
+                                style={styles.primaryStartBtn}
+                                onPress={() => navigation.navigate('Apply')}
+                            >
+                                <Ionicons name="document-text" size={18} color={theme.colors.primary} />
+                                <Text style={styles.primaryStartBtnText}>Start Application</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.secondaryStartBtn}
+                                onPress={() => navigation.navigate('PreliminaryIntake')}
+                            >
+                                <Ionicons name="speedometer" size={18} color="white" />
+                                <Text style={styles.secondaryStartBtnText}>Quick Eligibility Check</Text>
+                            </TouchableOpacity>
+                        </View>
                     </Card>
                 )}
 
-                {/* --- PRELIMINARY INTEREST CARD --- */}
-                {!activeApplication && (
-                    <Card style={styles.interestCard}>
-                        <View style={styles.interestContent}>
-                            <View style={styles.interestText}>
-                                <Text style={styles.interestTitle}>Early Eligibility Check</Text>
-                                <Text style={styles.interestDesc}>Not ready for a full application? See if you qualify in 2 minutes.</Text>
-                            </View>
-                            <View style={styles.interestIcon}>
-                                <Ionicons name="speedometer" size={32} color={theme.colors.primary} />
-                            </View>
+                {/* --- UPCOMING EVENTS SECTION --- */}
+                {upcomingEvents.length > 0 ? (
+                    <View style={{ marginBottom: theme.spacing.lg }}>
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>UPCOMING EVENTS</Text>
+                            <TouchableOpacity onPress={() => navigation.navigate('Calendar')}>
+                                <Text style={styles.seeAllText}>See All</Text>
+                            </TouchableOpacity>
                         </View>
-                        <TouchableOpacity
-                            style={styles.interestBtn}
-                            onPress={() => navigation.navigate('PreliminaryIntake')}
-                        >
-                            <Text style={styles.interestBtnText}>Check My Score</Text>
-                            <Ionicons name="chevron-forward" size={18} color={theme.colors.primary} />
-                        </TouchableOpacity>
-                    </Card>
-                )}
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -theme.spacing.lg }}>
+                            <View style={{ paddingHorizontal: theme.spacing.lg, flexDirection: 'row', gap: 12 }}>
+                                {upcomingEvents.filter(event => event.startDate).map((event) => (
+                                    <TouchableOpacity 
+                                        key={event.id} 
+                                        style={styles.eventCard}
+                                        onPress={() => navigation.navigate('Calendar', { eventId: event.id })}
+                                    >
+                                        <View style={styles.eventDateBadge}>
+                                            <Text style={styles.eventDateDay}>
+                                                {format(event.startDate?.toDate?.() ?? new Date(), 'd')}
+                                            </Text>
+                                            <Text style={styles.eventDateMonth}>
+                                                {format(event.startDate?.toDate?.() ?? new Date(), 'MMM')}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.eventInfo}>
+                                            <Text style={styles.eventTitle} numberOfLines={2}>{event.title}</Text>
+                                            <View style={styles.eventMeta}>
+                                                <Ionicons name={event.isVirtual ? 'videocam' : 'location'} size={12} color={theme.colors.textSecondary} />
+                                                <Text style={styles.eventLocation} numberOfLines={1}>
+                                                    {event.isVirtual ? 'Virtual' : event.location || 'TBD'}
+                                                </Text>
+                                            </View>
+                                            {event.isFeatured && (
+                                                <View style={styles.featuredBadge}>
+                                                    <Ionicons name="star" size={10} color="#FF9800" />
+                                                    <Text style={styles.featuredText}>Featured</Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </ScrollView>
+                    </View>
+                ) : null}
 
                 <Text style={styles.sectionTitle}>Tools & Services</Text>
 
@@ -324,53 +367,114 @@ const styles = StyleSheet.create({
         color: 'rgba(255,255,255,0.9)',
         lineHeight: 20,
     },
-    interestCard: {
-        marginBottom: theme.spacing.xl,
-        padding: theme.spacing.lg,
-        borderWidth: 1,
-        borderColor: theme.colors.primary,
-        backgroundColor: '#fff',
+    startAppButtons: {
+        flexDirection: 'row',
+        gap: 10,
     },
-    interestContent: {
+    primaryStartBtn: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 16,
+        justifyContent: 'center',
+        backgroundColor: 'white',
+        paddingVertical: 14,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        gap: 6,
     },
-    interestText: {
+    primaryStartBtnText: {
+        color: theme.colors.primary,
+        fontWeight: 'bold',
+        fontSize: 14,
+    },
+    secondaryStartBtn: {
         flex: 1,
-        marginRight: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        paddingVertical: 14,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.3)',
+        gap: 6,
     },
-    interestTitle: {
+    secondaryStartBtnText: {
+        color: 'white',
+        fontWeight: '600',
+        fontSize: 13,
+    },
+    // Event Card Styles
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: theme.spacing.md,
+        marginTop: theme.spacing.lg,
+    },
+    seeAllText: {
+        color: theme.colors.primary,
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    eventCard: {
+        width: 200,
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.borderRadius.lg,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        padding: 12,
+        flexDirection: 'row',
+        gap: 12,
+    },
+    eventDateBadge: {
+        width: 48,
+        height: 48,
+        backgroundColor: theme.colors.primary,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    eventDateDay: {
+        color: 'white',
         fontSize: 18,
-        fontWeight: '900',
+        fontWeight: 'bold',
+    },
+    eventDateMonth: {
+        color: 'rgba(255,255,255,0.8)',
+        fontSize: 11,
+        fontWeight: '600',
+        textTransform: 'uppercase',
+    },
+    eventInfo: {
+        flex: 1,
+    },
+    eventTitle: {
+        fontSize: 14,
+        fontWeight: '600',
         color: theme.colors.text,
         marginBottom: 4,
     },
-    interestDesc: {
-        fontSize: 13,
-        color: theme.colors.textSecondary,
-        lineHeight: 18,
-    },
-    interestIcon: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        backgroundColor: '#f0f4ff',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    interestBtn: {
+    eventMeta: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        padding: 12,
-        backgroundColor: '#f0f4ff',
-        borderRadius: 8,
-        gap: 8,
+        gap: 4,
     },
-    interestBtnText: {
-        color: theme.colors.primary,
-        fontWeight: 'bold',
-        fontSize: 15,
+    eventLocation: {
+        fontSize: 11,
+        color: theme.colors.textSecondary,
+        flex: 1,
+    },
+    featuredBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        marginTop: 4,
+    },
+    featuredText: {
+        fontSize: 10,
+        color: '#FF9800',
+        fontWeight: '600',
     },
 });

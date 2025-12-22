@@ -1,22 +1,52 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from app.core.config import get_settings
 import asyncio
 from app.services.sync_service import SyncService
 from fastapi.staticfiles import StaticFiles
 from app.api.routers import chat, documents, agents, knowledge, ventures, calendar, assistant, health, support
 from app.core.logging_config import init_logging
-from app.core.logging_config import init_logging
-from app.core.middleware import RequestContextMiddleware, RateLimitingMiddleware
+from app.core.middleware import RequestContextMiddleware, RateLimitingMiddleware, APIKeyMiddleware
+from app.core.sentry import init_sentry
+import logging
+
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 init_logging()
+
+# Initialize Sentry for error tracking
+init_sentry()
+
+# Log startup configuration
+logger.info(f"🧠 Starting AmPac Brain in {settings.ENV} mode")
+if settings.AUTH_DISABLED:
+    logger.warning("⚠️  AUTH_DISABLED=True - Authentication is bypassed!")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
+
+# Global exception handler - prevents leaking internal error details
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    
+    # In development, return more details
+    if settings.ENV == "development":
+        return JSONResponse(
+            status_code=500,
+            content={"detail": str(exc), "type": type(exc).__name__}
+        )
+    
+    # In production, return generic error
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An internal error occurred. Please try again later."}
+    )
 
 # CORS
 app.add_middleware(
@@ -37,6 +67,11 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 app.add_middleware(RequestContextMiddleware)
 app.add_middleware(RateLimitingMiddleware)
+
+# API Key middleware (only active if BRAIN_API_KEY is set)
+if settings.BRAIN_API_KEY:
+    app.add_middleware(APIKeyMiddleware, api_key=settings.BRAIN_API_KEY)
+    logger.info("🔐 API Key authentication enabled")
 
 @app.on_event("startup")
 async def startup_event():

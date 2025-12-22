@@ -11,6 +11,9 @@ interface ButtonProps {
     style?: StyleProp<ViewStyle>;
     textStyle?: StyleProp<TextStyle>;
     icon?: React.ReactNode;
+    accessibilityLabel?: string;
+    accessibilityHint?: string;
+    testID?: string;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -21,7 +24,10 @@ export const Button: React.FC<ButtonProps> = ({
     disabled = false,
     style,
     textStyle,
-    icon
+    icon,
+    accessibilityLabel,
+    accessibilityHint,
+    testID,
 }) => {
     const getBackgroundColor = () => {
         if (disabled) return theme.colors.border;
@@ -56,6 +62,15 @@ export const Button: React.FC<ButtonProps> = ({
             onPress={onPress}
             disabled={disabled || loading}
             activeOpacity={0.8}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel={accessibilityLabel || title}
+            accessibilityHint={accessibilityHint}
+            accessibilityState={{ 
+                disabled: disabled || loading,
+                busy: loading,
+            }}
+            testID={testID}
         >
             {loading ? (
                 <ActivityIndicator color={getTextColor()} />

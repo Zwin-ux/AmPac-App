@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 from typing import Optional
+import os
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "AmPac Brain 🧠"
@@ -62,6 +63,9 @@ class Settings(BaseSettings):
     # Storage
     STORAGE_BUCKET: Optional[str] = None
     
+    # Error Tracking
+    SENTRY_DSN: Optional[str] = None
+    
     # API Security
     BRAIN_API_KEY: Optional[str] = None
     JWT_SECRET: str = "ampac-secret-key-change-in-production"
@@ -70,11 +74,50 @@ class Settings(BaseSettings):
     # Auth (Firebase ID tokens)
     AUTH_DISABLED: bool = False
     AUTH_DEV_USER_ID: str = "demo_user"
+    
+    # Environment
+    ENV: str = "development"  # development, staging, production
 
     class Config:
         env_file = ".env"
         extra = "ignore"
 
+
+def validate_production_settings(settings: Settings) -> list[str]:
+    """
+    Validate settings for production environment.
+    Returns a list of error messages if validation fails.
+    """
+    errors = []
+    
+    if settings.ENV == "production":
+        # Critical: AUTH_DISABLED must be False in production
+        if settings.AUTH_DISABLED:
+            errors.append("AUTH_DISABLED cannot be True in production")
+        
+        # Critical: JWT secret must be changed from default
+        if settings.JWT_SECRET == "ampac-secret-key-change-in-production":
+            errors.append("JWT_SECRET must be changed from default value in production")
+        
+        # Critical: Must have Stripe configured for payments
+        if not settings.STRIPE_SECRET_KEY:
+            errors.append("STRIPE_SECRET_KEY is required in production")
+        
+        # Warning: CORS should be restricted
+        if "*" in settings.ALLOWED_CORS_ORIGINS:
+            print("⚠️  WARNING: CORS allows all origins (*) in production. Consider restricting.")
+    
+    return errors
+
+
 @lru_cache()
 def get_settings():
-    return Settings()
+    settings = Settings()
+    
+    # Validate production settings
+    errors = validate_production_settings(settings)
+    if errors:
+        error_msg = "\n".join(f"  - {e}" for e in errors)
+        raise ValueError(f"❌ Production configuration validation failed:\n{error_msg}")
+    
+    return settings
