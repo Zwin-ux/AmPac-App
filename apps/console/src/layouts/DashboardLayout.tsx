@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, FileText, Settings, LogOut, Menu, X, Activity, Brain, CreditCard, MessageSquare, Shield } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Settings, LogOut, Menu, X, Activity, Brain, CreditCard, MessageSquare, Shield, Megaphone, Building2 } from 'lucide-react';
 import { useMsal } from "@azure/msal-react";
 import CopilotSidebar from '../components/CopilotSidebar';
 
@@ -14,13 +14,13 @@ export default function DashboardLayout() {
         try {
             // Clear dev bypass flag
             localStorage.removeItem('ampac_dev_bypass');
-            
+
             // Attempt MSAL logout if active
             const account = instance.getActiveAccount();
             if (account) {
                 await instance.logoutPopup();
             }
-            
+
             navigate('/login');
         } catch (error) {
             console.error("Error signing out:", error);
@@ -37,7 +37,10 @@ export default function DashboardLayout() {
         { icon: Brain, label: 'Brain Console', path: '/brain' },
         { icon: CreditCard, label: 'Payments', path: '/payments' },
         { icon: MessageSquare, label: 'Teams', path: '/teams' },
+        { icon: Megaphone, label: 'Community Hub', path: '/community' },
+        { icon: Building2, label: 'Businesses', path: '/businesses' },
         { icon: Settings, label: 'Leads', path: '/leads' },
+        { icon: FileText, label: 'Intake Leads', path: '/pre-leads' },
         { icon: Settings, label: 'Settings', path: '/settings' },
     ];
 

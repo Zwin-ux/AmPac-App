@@ -10,6 +10,8 @@ export type OrganizationType = 'cdc' | 'lender_partner' | 'internal_ampac';
 
 export type LoanProductCode = 'sba_504' | 'sba_7a' | 'ca_ibank_guarantee' | 'internal_micro';
 
+export type BusinessRole = 'owner' | 'admin' | 'member';
+
 // Alias for backward compatibility
 export type ApplicationType = LoanProductCode;
 
@@ -77,7 +79,7 @@ export interface User {
     city?: string;
     email?: string;
     notificationsEnabled?: boolean;
-    
+
     // Business Card Customization
     cardColor?: string;
     businessStatus?: 'idea' | 'startup' | 'scaling' | 'established' | 'enterprise';
@@ -92,6 +94,7 @@ export interface User {
 
     // Optional skills/services tags
     skills?: string[];
+    badges?: string[];
 }
 
 export interface LoanProduct {
@@ -351,24 +354,41 @@ export interface Booking {
 
 export interface Business {
     id: string; // usually same as owner uid
-    ownerId?: string;
+    ownerId: string;
     name: string;
     industry: string;
     city: string;
     description?: string;
+    bio?: string; // Unified with bio if used elsewhere
     imageUrl?: string;
     ownerName?: string;
+    members: Record<string, BusinessRole>; // uid -> role
+    inviteCode?: string;
+    chatChannelId?: string; // Private channel for this business
+    isVerified?: boolean;
+    badges?: string[];
+    createdAt?: Timestamp;
 }
 
 export interface Event {
     id: string;
     title: string;
     description: string;
-    date: string; // ISO string
+    date: Timestamp;
+    endDate?: Timestamp;
     location: string;
     organizerId: string;
     organizerName: string;
+    organizerAvatar?: string;
+    organizerBadges?: string[];
+    organizerBusinessId?: string;
     attendees: string[]; // User IDs
+    imageUrl?: string;
+    type?: 'event' | 'workshop' | 'webinar';
+    engagementScore?: number;
+    featured?: boolean;
+    pinned?: boolean;
+    createdAt?: Timestamp;
 }
 
 export interface MarketplaceItem {
@@ -376,7 +396,7 @@ export interface MarketplaceItem {
     title: string;
     description: string;
     category: string;
-    url: string;
+    url?: string; // Optional - some items may not have active links
     badge?: string;
     priceLabel?: string;
     featured?: boolean;
@@ -421,6 +441,8 @@ export interface FeedPost {
     authorId: string;
     authorName: string;
     authorAvatar?: string;
+    authorBadges?: string[];
+    authorBusinessId?: string; // If posted on behalf of a business
     orgId?: string;
 
     content: string;
@@ -428,8 +450,45 @@ export interface FeedPost {
 
     likes: string[]; // Array of UIDs
     commentCount: number;
+    viewCount?: number;
+    engagementScore?: number;
 
     type: 'announcement' | 'showcase' | 'qa';
+    featured?: boolean;
+    pinned?: boolean;
 
     createdAt: Timestamp;
 }
+
+export interface Comment {
+    id: string;
+    postId: string;
+    authorId: string;
+    authorName: string;
+    authorAvatar?: string;
+    authorBadges?: string[];
+
+    content: string;
+    likes: string[];
+
+    parentCommentId?: string;  // For nested replies
+    replyCount: number;
+
+    isHelpful: boolean;  // Marked by post author
+    isEdited: boolean;
+
+    createdAt: Timestamp;
+    updatedAt?: Timestamp;
+}
+
+export interface Notification {
+    id: string;
+    userId: string; // Target user
+    type: 'invite' | 'rsvp' | 'mention' | 'system' | 'comment' | 'like' | 'reply';
+    title: string;
+    body: string;
+    data?: Record<string, any>;
+    read: boolean;
+    createdAt: Timestamp;
+}
+

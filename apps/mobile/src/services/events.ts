@@ -1,54 +1,95 @@
+import {
+    collection,
+    query,
+    orderBy,
+    getDocs,
+    addDoc,
+    serverTimestamp,
+    doc,
+    updateDoc,
+    arrayUnion,
+    arrayRemove,
+    Timestamp,
+    where
+} from 'firebase/firestore';
+import { db, auth } from '../../firebaseConfig';
 import { Event } from '../types';
-
-// Mock data
-let MOCK_EVENTS: Event[] = [
-    {
-        id: '1',
-        title: 'AmPac Holiday Mixer',
-        description: 'Celebrate the season with fellow entrepreneurs! Food, drinks, and networking opportunities galore.',
-        date: new Date(Date.now() + 86400000 * 1).toISOString(), // Tomorrow
-        location: 'AmPac Innovation Center - Main Hall',
-        organizerId: 'ampac_admin',
-        organizerName: 'Hilda Kennedy',
-        attendees: ['user1', 'user2', 'user4', 'user5']
-    },
-    {
-        id: '2',
-        title: 'SBA 504 Loan Webinar',
-        description: 'Everything you need to know about purchasing commercial real estate with 10% down.',
-        date: new Date(Date.now() + 86400000 * 3).toISOString(), // 3 days
-        location: 'Online (Zoom)',
-        organizerId: 'expert_1',
-        organizerName: 'Ed Ryan',
-        attendees: ['user3', 'user6']
-    },
-    {
-        id: '3',
-        title: 'Women in Business Breakfast',
-        description: 'A morning of inspiration and connection for women business owners in the Inland Empire.',
-        date: new Date(Date.now() + 86400000 * 7).toISOString(), // 1 week
-        location: 'Riverside Convention Center',
-        organizerId: 'expert_2',
-        organizerName: 'Nicole J. Jones',
-        attendees: ['user7', 'user8', 'user9']
-    }
-];
+import { notificationService } from './notificationService';
+import { getDoc } from 'firebase/firestore';
 
 export const getEvents = async (): Promise<Event[]> => {
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return [...MOCK_EVENTS].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    try {
+        const eventsRef = collection(db, 'events');
+        const q = query(eventsRef, orderBy('date', 'asc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        } as Event));
+    } catch (error) {
+        console.error("Error fetching events:", error);
+        return [];
+    }
 };
 
-export const createEvent = async (event: Omit<Event, 'id' | 'attendees'>): Promise<Event> => {
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    const newEvent: Event = {
-        ...event,
-        id: Math.random().toString(36).substr(2, 9),
-        attendees: []
-    };
-    
-    MOCK_EVENTS.push(newEvent);
-    return newEvent;
+export const createEvent = async (event: Omit<Event, 'id' | 'attendees' | 'engagementScore' | 'organizerId' | 'organizerName'>): Promise<string> => {
+    try {
+        const user = auth.currentUser;
+        if (!user) throw new Error("Authentication required");
+
+        const eventsRef = collection(db, 'events');
+        // Fetch user profile for badges
+        const userSnap = await getDoc(doc(db, 'users', user.uid));
+        const userData = userSnap.exists() ? userSnap.data() as any : {};
+        const badges = userData.badges || [];
+
+        const newEvent = {
+            ...event,
+            organizerId: user.uid,
+            organizerName: user.displayName || 'AmPac User',
+            organizerAvatar: user.photoURL || undefined,
+            organizerBadges: badges,
+            attendees: [],
+            engagementScore: 0,
+            createdAt: serverTimestamp()
+        };
+
+        const docRef = await addDoc(eventsRef, newEvent);
+        return docRef.id;
+    } catch (error) {
+        console.error("Error creating event:", error);
+        throw error;
+    }
+};
+
+export const toggleRSVP = async (eventId: string, isJoining: boolean) => {
+    try {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        const eventRef = doc(db, 'events', eventId);
+        await updateDoc(eventRef, {
+            attendees: isJoining ? arrayUnion(user.uid) : arrayRemove(user.uid),
+            engagementScore: isJoining ? serverTimestamp() : serverTimestamp()
+        });
+
+        // Send Notification if joining
+        if (isJoining) {
+            const eventSnap = await getDoc(eventRef);
+            if (eventSnap.exists()) {
+                const eventData = eventSnap.data() as Event;
+                // Don't notify if self-RSVP
+                if (eventData.organizerId !== user.uid) {
+                    await notificationService.sendRSVPNotification(
+                        eventData.organizerId,
+                        eventData.title,
+                        eventId,
+                        user.displayName || 'A user'
+                    );
+                }
+            }
+        }
+    } catch (error) {
+        console.error("Error toggling RSVP:", error);
+    }
 };

@@ -216,24 +216,37 @@ export interface IntegrationMapping {
 
 export interface Business {
     id: string; // usually same as owner uid
-    ownerId?: string;
+    ownerId: string;
     name: string;
     industry: string;
     city: string;
     description?: string;
     imageUrl?: string;
     ownerName?: string;
+    members: Record<string, 'owner' | 'admin' | 'member'>;
+    inviteCode?: string;
+    chatChannelId?: string;
+    isVerified?: boolean;
 }
 
 export interface Event {
     id: string;
     title: string;
     description: string;
-    date: string; // ISO string
+    date: Timestamp;
     location: string;
     organizerId: string;
     organizerName: string;
+    organizerAvatar?: string;
+    organizerBusinessId?: string;
     attendees: string[]; // User IDs
+    imageUrl?: string;
+    rsvpCount?: number; // Added based on instruction snippet
+    type?: 'event' | 'workshop' | 'webinar';
+    engagementScore?: number;
+    featured?: boolean;
+    pinned?: boolean;
+    createdAt: Timestamp;
 }
 
 export interface MarketplaceItem {
@@ -261,9 +274,46 @@ export interface FeedPost {
 
     likes: string[]; // Array of UIDs
     commentCount: number;
+    viewCount?: number;
 
     type: 'announcement' | 'showcase' | 'qa';
 
+    featured?: boolean;
+    pinned?: boolean;
+    engagementScore?: number;
+
+    createdAt: Timestamp;
+}
+
+export interface Report {
+    id: string;
+    targetId: string;
+    targetType: 'post' | 'event' | 'comment';
+    reason: string;
+    reporterId: string;
+    reporterName?: string;
+    targetContent?: string;
+    status: 'pending' | 'resolved' | 'dismissed';
+    createdAt: Timestamp;
+}
+
+export interface PreliminaryLead {
+    id: string;
+    userId?: string;
+    fullName: string;
+    email: string;
+    ficoRange: string;
+    loanAmountDesired: number;
+    businessIndustry: string;
+    yearsInBusiness: number;
+    purpose: string;
+    status: 'new' | 'reviewing' | 'contacted' | 'converted';
+    assignedTo?: string;
+    notes?: {
+        authorName: string;
+        text: string;
+        createdAt: Timestamp;
+    }[];
     createdAt: Timestamp;
 }
 

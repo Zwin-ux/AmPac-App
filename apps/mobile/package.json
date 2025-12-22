@@ -13,7 +13,8 @@
     "export:android": "expo export -p android --output-dir dist-android",
     "test:e2e": "npm run export:web && playwright test",
     "test:e2e:headed": "npm run export:web && playwright test --headed",
-    "test:sync-queue": "tsx scripts/test-sync-queue.ts"
+    "test:sync-queue": "tsx scripts/test-sync-queue.ts",
+    "test": "jest"
   },
   "dependencies": {
     "@expo/metro-config": "~54.0.2",
@@ -32,6 +33,8 @@
     "expo-document-picker": "~14.0.1",
     "expo-font": "~14.0.9",
     "expo-image-manipulator": "~14.0.7",
+    "expo-image-picker": "~17.0.10",
+    "expo-notifications": "~0.32.15",
     "expo-sharing": "~14.0.7",
     "expo-sms": "~14.0.7",
     "expo-status-bar": "~3.0.8",
@@ -46,8 +49,15 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
+    "@testing-library/react-native": "^13.3.3",
+    "@types/jest": "^30.0.0",
     "@types/react": "~19.1.0",
+    "@types/react-test-renderer": "^19.1.0",
     "babel-preset-expo": "^54.0.7",
+    "jest": "^30.2.0",
+    "jest-expo": "^54.0.16",
+    "react-test-renderer": "^19.2.3",
+    "ts-jest": "^29.4.6",
     "ts-node": "^10.9.1",
     "tsx": "^4.20.6",
     "typescript": "~5.9.2"

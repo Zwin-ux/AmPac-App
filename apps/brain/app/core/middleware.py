@@ -38,3 +38,34 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             if response:
                 response.headers["x-request-id"] = request_id
             request_id_ctx_var.reset(token)
+
+
+class RateLimitingMiddleware(BaseHTTPMiddleware):
+    """
+    Extremely simple in-memory rate limiter for production stability.
+    Limit: 100 requests per minute per IP.
+    """
+    def __init__(self, app):
+        super().__init__(app)
+        self.request_counts = {}  # {ip: [(timestamp, count)]}
+        self.limit = 100
+        self.window = 60 # seconds
+
+    async def dispatch(self, request: Request, call_next):
+        client_ip = request.client.host
+        now = time.time()
+        
+        # Clean up old window data
+        history = self.request_counts.get(client_ip, [])
+        history = [t for t in history if now - t < self.window]
+        
+        if len(history) >= self.limit:
+            return Response(
+                content="Rate limit exceeded. Try again in a minute.", 
+                status_code=429
+            )
+            
+        history.append(now)
+        self.request_counts[client_ip] = history
+        
+        return await call_next(request)

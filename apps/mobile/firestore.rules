@@ -39,9 +39,11 @@ service cloud.firestore {
     }
 
     function isApplicationOwner(appId) {
-      return isAuthenticated() &&
-        applicationExists(appId) &&
-        isApplicationOwnerData(get(/databases/$(database)/documents/applications/$(appId)).data);
+      let appData = get(/databases/$(database)/documents/applications/$(appId)).data;
+      return isAuthenticated() && (
+        (appData.userId != null && appData.userId == request.auth.uid) ||
+        (appData.primaryBorrowerUserId != null && appData.primaryBorrowerUserId == request.auth.uid)
+      );
     }
 
     function disallowClientFields(changedKeys, disallowed) {
@@ -96,15 +98,10 @@ service cloud.firestore {
       );
 
       allow update: if isAuthenticated() && (
+        isStaff() ||
         (
-          isStaff() &&
-          // prevent staff clients from tampering with sync-owned fields
-          !hasDisallowedApplicationFieldChanges()
-        ) ||
-        (
-          isApplicationOwnerData(resource.data) &&
+          resource.data.userId == request.auth.uid &&
           request.resource.data.userId == resource.data.userId &&
-          request.resource.data.userId == request.auth.uid &&
           !hasDisallowedApplicationFieldChanges()
         )
       );
@@ -163,12 +160,41 @@ service cloud.firestore {
       allow delete: if false;
     }
     
-    // --- BUSINESSES (Network) ---
+    // --- BUSINESSES (Network & Groups) ---
     match /businesses/{businessId} {
         allow read: if true;
-        // Borrowers can write their own business profile doc; staff can write any.
-        allow create, update: if isAuthenticated() && (isStaff() || businessId == request.auth.uid);
-        allow delete: if isAdmin();
+
+        function isBusinessOwner() {
+            return isAuthenticated() && (
+                businessId == request.auth.uid || 
+                resource.data.ownerId == request.auth.uid ||
+                resource.data.members[request.auth.uid] == 'owner'
+            );
+        }
+
+        function isBusinessAdmin() {
+            return isAuthenticated() && (
+                isBusinessOwner() || 
+                resource.data.members[request.auth.uid] == 'admin'
+            );
+        }
+
+        // Create: Auth user can create their own business listing.
+        allow create: if isAuthenticated() && (isStaff() || request.resource.data.ownerId == request.auth.uid);
+
+        // Update: Owner/Admin can update; Any Auth user can join if they have the inviteCode (via specific atomic update).
+        allow update: if isAuthenticated() && (
+            isStaff() || 
+            isBusinessAdmin() ||
+            (
+                // Allow "Join" logic: User can only add themselves as 'member' if inviteCode matches.
+                request.resource.data.diff(resource.data).changedKeys().hasOnly(['members']) &&
+                request.resource.data.members[request.auth.uid] == 'member' &&
+                request.resource.data.inviteCode == resource.data.inviteCode
+            )
+        );
+
+        allow delete: if isAdmin() || isBusinessOwner();
     }
 
     // --- CHAT & SOCIAL ---
@@ -176,13 +202,19 @@ service cloud.firestore {
       // 1. Public channels: Any Auth user can read.
       // 2. Private channels: Only members can read.
       // 3. Create: Any Auth user can create (and becomes member).
-      allow read: if isAuthenticated() && (
-          resource.data.type == 'public' || 
-          request.auth.uid in resource.data.members
-      );
+      // Community channels are readable/queryable by anyone (including unauthenticated)
+      // for public engagement. Other orgs are restricted to public or members.
+      allow read: if 
+          orgId == 'ampac-community' ||
+          (isAuthenticated() && (
+              resource.data.type == 'public' || 
+              request.auth.uid in resource.data.members
+          ));
+      
       allow create: if isAuthenticated(); 
       // Update: members only (e.g. adding members)
       allow update: if isAuthenticated() && (
+          orgId == 'ampac-community' ||
           request.auth.uid in resource.data.members
       );
       
@@ -194,10 +226,12 @@ service cloud.firestore {
          );
          // Create: Must be member of channel (even public ones, ideally, but public implies membership is open)
          // Simpler: If public, anyone can post. If private, only members.
-         allow create: if isAuthenticated() && (
-             get(/databases/$(database)/documents/organizations/$(orgId)/channels/$(channelId)).data.type == 'public' ||
-             request.auth.uid in get(/databases/$(database)/documents/organizations/$(orgId)/channels/$(channelId)).data.members
-         );
+         allow create: if isAuthenticated() && 
+             request.resource.data.senderId == request.auth.uid &&
+             (
+                 get(/databases/$(database)/documents/organizations/$(orgId)/channels/$(channelId)).data.type == 'public' ||
+                 request.auth.uid in get(/databases/$(database)/documents/organizations/$(orgId)/channels/$(channelId)).data.members
+             );
          // Update: Only sender can edit/delete their own message
          allow update, delete: if isAuthenticated() && resource.data.senderId == request.auth.uid;
       }
@@ -212,15 +246,38 @@ service cloud.firestore {
     
     match /posts/{postId} {
        allow read: if true;
-       allow create: if isAuthenticated() && request.resource.data.authorId == request.auth.uid;
+       allow create: if isAuthenticated() && 
+           request.resource.data.authorId == request.auth.uid &&
+           disallowClientFields(request.resource.data.keys(), ['featured', 'pinned', 'engagementScore']);
 
        // Allow likes by any authenticated user, but only allow author to change other fields.
        allow update: if isAuthenticated() && (
-         resource.data.authorId == request.auth.uid ||
-         request.resource.data.diff(resource.data).changedKeys().hasOnly(['likes'])
+         (
+             resource.data.authorId == request.auth.uid && 
+             disallowClientFields(request.resource.data.diff(resource.data).changedKeys(), ['featured', 'pinned', 'engagementScore'])
+         ) ||
+         request.resource.data.diff(resource.data).changedKeys().hasOnly(['likes']) ||
+         isStaff()
        );
 
        allow delete: if isAuthenticated() && (resource.data.authorId == request.auth.uid || isStaff());
+    }
+
+    match /events/{eventId} {
+       allow read: if true;
+       allow create: if isAuthenticated() && 
+           disallowClientFields(request.resource.data.keys(), ['featured', 'pinned', 'engagementScore']);
+       
+       allow update: if isAuthenticated() && (
+         (
+             resource.data.organizerId == request.auth.uid && 
+             disallowClientFields(request.resource.data.diff(resource.data).changedKeys(), ['featured', 'pinned', 'engagementScore'])
+         ) ||
+         request.resource.data.diff(resource.data).changedKeys().hasAny(['attendees', 'engagementScore']) ||
+         isStaff()
+       );
+       
+       allow delete: if isAuthenticated() && (resource.data.organizerId == request.auth.uid || isStaff());
     }
 
     // --- DOCUMENT REQUESTS & UPLOADED DOCUMENTS ---
@@ -251,6 +308,20 @@ service cloud.firestore {
     match /payments/{paymentId} {
       allow read, write: if isStaff();
       allow delete: if isAdmin();
+    }
+
+    // --- MARKETPLACE ---
+    match /marketplace_items/{itemId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    // --- PRELIMINARY LEADS (Lite Intake) ---
+    match /preliminary_leads/{leadId} {
+        allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+        allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isStaff());
+        allow update: if isStaff();
+        allow delete: if isAdmin();
     }
   }
 }

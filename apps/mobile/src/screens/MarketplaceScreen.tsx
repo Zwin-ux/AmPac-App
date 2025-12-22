@@ -6,6 +6,8 @@ import { theme } from '../theme';
 import { Card } from '../components/ui/Card';
 import { marketplaceService } from '../services/marketplace';
 import type { MarketplaceItem } from '../types';
+import EmptyState from '../components/ui/EmptyState';
+import SkeletonLoader from '../components/SkeletonLoader';
 
 type Category = 'All' | string;
 
@@ -134,12 +136,21 @@ export default function MarketplaceScreen({ navigation }: any) {
                 </Card>
 
                 {loading ? (
-                    <View style={styles.centered}>
-                        <ActivityIndicator size="large" color={theme.colors.primary} />
+                    <View style={styles.listWrap}>
+                        <Text style={styles.sectionLabel}>LOADING MARKETPLACE...</Text>
+                        {[1, 2, 3, 4, 5].map((i) => (
+                            <View key={i} style={styles.skeletonRow}>
+                                <SkeletonLoader width={36} height={36} borderRadius={theme.borderRadius.md} />
+                                <View style={{ flex: 1, gap: 8 }}>
+                                    <SkeletonLoader width="60%" height={16} />
+                                    <SkeletonLoader width="90%" height={12} />
+                                </View>
+                            </View>
+                        ))}
                     </View>
                 ) : (
                     <>
-                        {featured.length ? (
+                        {featured.length > 0 && category === 'All' && !query && (
                             <View style={{ marginBottom: theme.spacing.lg }}>
                                 <Text style={styles.sectionLabel}>FEATURED</Text>
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -160,14 +171,26 @@ export default function MarketplaceScreen({ navigation }: any) {
                                     ))}
                                 </ScrollView>
                             </View>
-                        ) : null}
+                        )}
 
-                        <Text style={styles.sectionLabel}>ALL ITEMS</Text>
+                        <Text style={styles.sectionLabel}>
+                            {query || category !== 'All' ? `SEARCH RESULTS (${filtered.length})` : 'ALL ITEMS'}
+                        </Text>
                         <View style={styles.listWrap}>
-                            {filtered.map(renderItemRow)}
-                            {filtered.length === 0 ? (
-                                <Text style={styles.emptyText}>No matches. Try a different search.</Text>
-                            ) : null}
+                            {filtered.length > 0 ? (
+                                filtered.map(renderItemRow)
+                            ) : (
+                                <EmptyState
+                                    title="No Items Found"
+                                    description={query ? `We couldn't find anything matching "${query}". Try different keywords.` : "No items available in this category yet."}
+                                    icon="search"
+                                    actionLabel="Clear Filters"
+                                    onAction={() => {
+                                        setQuery('');
+                                        setCategory('All');
+                                    }}
+                                />
+                            )}
                         </View>
                     </>
                 )}
@@ -368,9 +391,16 @@ const styles = StyleSheet.create({
         color: theme.colors.textSecondary,
         letterSpacing: 0.2,
     },
-    emptyText: {
-        ...theme.typography.caption,
-        marginTop: theme.spacing.md,
+    skeletonRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: theme.spacing.md,
+        backgroundColor: theme.colors.surface,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        borderRadius: theme.borderRadius.md,
+        gap: theme.spacing.md,
+        marginBottom: theme.spacing.sm,
     },
 });
 

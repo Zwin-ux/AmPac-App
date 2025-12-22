@@ -55,8 +55,6 @@ export default function AssistantScreen() {
             const { API_URL } = await import('../config');
             const token = await getFirebaseIdToken();
 
-            console.log(`[Assistant] Sending request to: ${API_URL}/chat/completions`);
-
             const response = await fetch(`${API_URL}/chat/completions`, {
                 method: 'POST',
                 headers: {
@@ -77,16 +75,12 @@ export default function AssistantScreen() {
                 })
             });
 
-            console.log(`[Assistant] Response Status: ${response.status}`);
-
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error(`[Assistant] Error Body: ${errorText}`);
                 throw new Error(`Server error: ${response.status} - ${errorText}`);
             }
 
             const data = await response.json();
-            console.log('[Assistant] Response Data:', data);
 
             // Handle both sync response formats (standard OpenAI or custom)
             let content = data.choices?.[0]?.message?.content || data.response || "I didn't get a response.";
@@ -99,7 +93,6 @@ export default function AssistantScreen() {
                 try {
                     const actionJson = match[1];
                     const action = JSON.parse(actionJson);
-                    console.log("[Assistant] Detected Action:", action);
 
                     // Remove tag from content
                     content = content.replace(match[0], '').trim();
@@ -109,13 +102,10 @@ export default function AssistantScreen() {
                         // Small delay to let user read message
                         setTimeout(() => {
                             // Use root navigation if possible, or assume we are in a tab navigator
-                            // We need useNavigation for this.
-                            // For now, I'll assume navigation prop is available or I'll add useNavigation
                         }, 1500);
-                        // We need to access navigation. I'll add useNavigation hook at the top.
                     }
                 } catch (e) {
-                    console.error("[Assistant] Failed to parse action:", e);
+                    // Silently fail for malformed actions
                 }
             }
 
@@ -141,7 +131,6 @@ export default function AssistantScreen() {
             }
 
         } catch (err) {
-            console.error('[Assistant] Request Failed:', err);
             setError(getErrorMessage('assistantUnavailable'));
         } finally {
             setIsLoading(false);

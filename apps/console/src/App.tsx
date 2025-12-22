@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useIsAuthenticated } from "@azure/msal-react";
 import LoginPage from './pages/LoginPage';
@@ -10,8 +10,10 @@ import BrainPage from './pages/BrainPage';
 import PaymentsPage from './pages/PaymentsPage';
 import TeamsIntegrationPage from './pages/TeamsIntegrationPage';
 import WebsiteLeadsPage from './pages/WebsiteLeadsPage';
+import PreliminaryLeadsPage from './pages/PreliminaryLeadsPage';
 import MarketplaceConfigPage from './pages/MarketplaceConfigPage';
 import CommunityManagementPage from './pages/CommunityManagementPage';
+import BusinessDirectoryPage from './pages/BusinessDirectoryPage';
 import OpsConsolePage from './pages/OpsConsolePage';
 import DashboardLayout from './layouts/DashboardLayout';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
@@ -19,24 +21,7 @@ import { useNotifications } from './hooks/useNotifications';
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const isAuthenticated = useIsAuthenticated();
-  const [checking, setChecking] = useState(true);
 
-  useEffect(() => {
-    // REMOVED: Dev bypass for security
-    // const bypass = localStorage.getItem('ampac_dev_bypass') === 'true';
-    // setIsDevBypass(bypass);
-
-    // MSAL handles its own loading state usually
-    setChecking(false);
-  }, [isAuthenticated]);
-
-  if (checking) return <div className="min-h-screen flex items-center justify-center bg-surfaceHighlight text-textSecondary">Loading...</div>;
-
-  // REMOVED: Dev bypass for security
-  // if (!isAuthenticated && !isDevBypass) {
-  //   return <Navigate to="/login" replace />;
-  // }
-  
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
@@ -65,8 +50,10 @@ export default function App() {
           <Route path="payments" element={<PaymentsPage />} />
           <Route path="teams" element={<TeamsIntegrationPage />} />
           <Route path="leads" element={<WebsiteLeadsPage />} />
+          <Route path="pre-leads" element={<PreliminaryLeadsPage />} />
           <Route path="marketplace" element={<MarketplaceConfigPage />} />
           <Route path="community" element={<CommunityManagementPage />} />
+          <Route path="businesses" element={<BusinessDirectoryPage />} />
           <Route path="ops" element={<OpsConsolePage />} />
           <Route path="admin" element={<AdminPage />} />
         </Route>

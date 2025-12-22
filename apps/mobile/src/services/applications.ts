@@ -14,6 +14,8 @@ import {
 import { db } from '../../firebaseConfig';
 import { Application, ApplicationType } from '../types';
 import { cacheService } from './cache';
+import { API_URL } from '../config';
+import { getFirebaseIdToken } from './brainAuth';
 
 export const APPLICATION_CACHE_KEY_PREFIX = 'cache_application_';
 const buildCacheKey = (userId: string) => `${APPLICATION_CACHE_KEY_PREFIX}${userId}`;
@@ -126,6 +128,33 @@ export const saveApplication = async (id: string, data: Partial<Application>): P
 };
 
 export const createApplication = async (userId: string, type: ApplicationType): Promise<Application> => {
+    // 1. Try to create via backend API first
+    try {
+        const token = await getFirebaseIdToken();
+        const response = await fetch(`${API_URL}/applications/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ type })
+        });
+
+        if (response.ok) {
+            const remoteApp = await response.json();
+            // Backend returns full app with documents initialized
+            await cacheApplicationSnapshot(remoteApp);
+            console.log('[Applications] Created via API:', remoteApp.id);
+            return remoteApp;
+        } else {
+            const err = await response.text();
+            console.warn('[Applications] API creation failed:', response.status, err);
+        }
+    } catch (error) {
+        console.warn('[Applications] API creation error, falling back to local:', error);
+    }
+
+    // 2. Fallback to local creation (Original logic)
     const newApp: Application = {
         id: `app_${Date.now()}`,
         userId,
@@ -143,11 +172,9 @@ export const createApplication = async (userId: string, type: ApplicationType): 
         lastUpdated: Timestamp.now(),
     };
 
-    // Save locally first (guaranteed to work)
     await cacheApplicationSnapshot(newApp);
-    console.log('[Applications] Created locally:', newApp.id);
+    console.log('[Applications] Created locally (fallback):', newApp.id);
 
-    // Try Firestore (non-blocking)
     try {
         const appDoc = doc(db, 'applications', newApp.id);
         await setDoc(appDoc, newApp);
@@ -160,6 +187,27 @@ export const createApplication = async (userId: string, type: ApplicationType): 
 };
 
 export const submitApplication = async (application: Application): Promise<void> => {
+    // 1. Try to submit via backend API
+    try {
+        const token = await getFirebaseIdToken();
+        const response = await fetch(`${API_URL}/applications/${application.id}/submit`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            }
+        });
+
+        if (response.ok) {
+            const updatedApp = await response.json();
+            await cacheApplicationSnapshot(updatedApp);
+            console.log('[Applications] Submitted via API:', application.id);
+            return;
+        }
+    } catch (error) {
+        console.warn('[Applications] API submission failed, falling back to direct update:', error);
+    }
+
+    // 2. Fallback to direct update
     const updates: Partial<Application> = {
         status: 'submitted',
         lastUpdated: Timestamp.now()
@@ -167,7 +215,7 @@ export const submitApplication = async (application: Application): Promise<void>
 
     await saveApplication(application.id, { ...application, ...updates });
     await cacheApplicationSnapshot({ ...application, ...updates });
-    console.log('[Applications] Application submitted:', application.id);
+    console.log('[Applications] Application submitted (direct):', application.id);
 };
 
 export const getUserApplications = async (userId: string): Promise<Application[]> => {

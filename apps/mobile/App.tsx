@@ -27,6 +27,10 @@ import ChatScreenWrapper from './src/screens/ChatScreenWrapper';
 import DemographicsScreen from './src/screens/DemographicsScreen';
 import SkillsScreen from './src/screens/SkillsScreen';
 import MarketplaceScreen from './src/screens/MarketplaceScreen';
+import ErrorBoundary from './src/components/ErrorBoundary';
+import { ToastProvider } from './src/context/ToastContext';
+import PreliminaryIntakeScreen from './src/screens/PreliminaryIntakeScreen';
+import BusinessAdminScreen from './src/screens/BusinessAdminScreen';
 
 // Types
 import { theme } from './src/theme';
@@ -35,6 +39,9 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { User } from './src/types';
 import { auth } from './firebaseConfig';
 import { userStore } from './src/services/userStore';
+import { notificationService } from './src/services/notificationService';
+import { useToast } from './src/context/ToastContext';
+import { seedAmpacBusiness, checkIfAmpacExists } from './src/services/seedAmpacBusiness';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -116,11 +123,51 @@ function AppStack() {
 
     userStore.hydrateFromStorage();
 
+    // Initialize AMPAC business on first launch
+    const initializeAmpac = async () => {
+      try {
+        const exists = await checkIfAmpacExists();
+        if (!exists) {
+          console.log('🏢 Seeding AMPAC business...');
+          await seedAmpacBusiness();
+          console.log('✅ AMPAC business seeded successfully!');
+        }
+      } catch (error) {
+        console.error('❌ Error initializing AMPAC business:', error);
+      }
+    };
+    initializeAmpac();
+
     return () => {
       unsubscribe();
       authUnsubscribe();
     };
   }, []);
+
+  // Notification Listener
+  const { showToast } = useToast();
+  React.useEffect(() => {
+    if (!user) return;
+
+    const unsubNotifications = notificationService.subscribeToNotifications(user.uid, (notifications) => {
+      // Find unread notifications created in the last 10 seconds (to avoid spamming on load)
+      // Actually, subscribeToNotifications returns unread ones.
+      // We'll just toast the newest one if it's new.
+      // For simplicity in this demo, we'll just toast the first one if it exists and we haven't seen it in this session constraint?
+      // Better: Just toast the top one if it's unread.
+      // Real implementation would track "seen" locally to avoid re-toasting on refresh.
+      // For now, let's just mark it as read immediately after toasting?
+      // Or simply:
+      const latest = notifications[0];
+      if (latest && !latest.read) {
+        showToast({ message: `${latest.title}: ${latest.body}`, type: 'info', duration: 4000 });
+        // Mark as read so it doesn't pop again next time
+        notificationService.markAsRead(latest.id);
+      }
+    });
+
+    return () => unsubNotifications();
+  }, [user]);
 
   if (loading) {
     return null;
@@ -142,9 +189,11 @@ function AppStack() {
           <Stack.Screen name="Marketplace" component={MarketplaceScreen} />
           <Stack.Screen name="Payment" component={PaymentScreen} />
           <Stack.Screen name="Feed" component={FeedScreen} />
+          <Stack.Screen name="PreliminaryIntake" component={PreliminaryIntakeScreen} />
           <Stack.Screen name="Network" component={NetworkScreen} />
           <Stack.Screen name="Chat" component={ChatScreenWrapper} />
           <Stack.Screen name="Profile" component={ProfileScreen} />
+          <Stack.Screen name="BusinessAdmin" component={BusinessAdminScreen} />
         </>
       ) : (
         <>

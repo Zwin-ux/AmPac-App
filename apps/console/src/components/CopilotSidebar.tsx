@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Send, Sparkles } from 'lucide-react';
+import { X, Send, Sparkles, ChevronDown } from 'lucide-react';
 
 type Message = {
     id: string;
@@ -13,6 +13,7 @@ type Message = {
 
 export default function CopilotSidebar() {
     const [isOpen, setIsOpen] = useState(false);
+    const [isMinimized, setIsMinimized] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputText, setInputText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -24,7 +25,7 @@ export default function CopilotSidebar() {
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages, isOpen]);
+    }, [messages, isOpen, isMinimized]);
 
     const handleSend = async () => {
         if (!inputText.trim()) return;
@@ -98,6 +99,20 @@ export default function CopilotSidebar() {
         );
     }
 
+    if (isMinimized) {
+        return (
+            <div className="fixed bottom-6 right-6 flex flex-col items-end gap-2 z-50">
+                <button
+                    onClick={() => setIsMinimized(false)}
+                    className="bg-surface border border-primary text-primary px-4 py-2 rounded-full shadow-lg hover:bg-primary hover:text-white transition-all flex items-center gap-2"
+                >
+                    <Sparkles className="w-4 h-4" />
+                    <span className="text-xs font-bold">Resuming Chat...</span>
+                </button>
+            </div>
+        );
+    }
+
     return (
         <div className="w-96 bg-surface border-l border-border flex flex-col h-full shadow-xl transition-all duration-300 z-50">
             {/* Header */}
@@ -106,12 +121,22 @@ export default function CopilotSidebar() {
                     <Sparkles className="w-5 h-5 text-primary" />
                     <h2 className="font-bold text-text">Staff Copilot</h2>
                 </div>
-                <button
-                    onClick={() => setIsOpen(false)}
-                    className="p-1 hover:bg-gray-200 rounded text-textSecondary"
-                >
-                    <X className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-1">
+                    <button
+                        onClick={() => setIsMinimized(true)}
+                        className="p-1 hover:bg-gray-200 rounded text-textSecondary"
+                        title="Minimize"
+                    >
+                        <ChevronDown className="w-5 h-5" />
+                    </button>
+                    <button
+                        onClick={() => setIsOpen(false)}
+                        className="p-1 hover:bg-gray-200 rounded text-textSecondary"
+                        title="Close"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
             </div>
 
             {/* Messages */}

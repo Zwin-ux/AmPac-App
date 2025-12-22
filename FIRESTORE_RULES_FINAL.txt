@@ -1,0 +1,132 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    // Users - can only modify own profile
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId);
+      
+      // Blocked users subcollection
+      match /blocked/{blockedId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+    
+    // Posts - public read, authenticated write
+    match /posts/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn();
+    }
+    
+    // Comments - public read, authenticated write
+    match /comments/{commentId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn();
+    }
+    
+    // Events - public read, authenticated write
+    match /events/{eventId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn();
+    }
+    
+    // Businesses - public read, authenticated write
+    match /businesses/{businessId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn();
+    }
+    
+    // Applications - CRITICAL: owner only
+    match /applications/{applicationId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn();
+    }
+    
+    // Notifications - recipient only
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn();
+    }
+    
+    // Channels - authenticated access
+    match /channels/{channelId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    // Messages - authenticated access
+    match /messages/{messageId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    // Organizations with nested channels/messages (CRITICAL FIX)
+    match /organizations/{orgId}/channels/{channelId} {
+      allow read, write: if isSignedIn();
+      
+      match /messages/{messageId} {
+        allow read, write: if isSignedIn();
+      }
+    }
+    
+    // Event reminders
+    match /event_reminders/{reminderId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    // Support notifications
+    match /support_notifications/{notificationId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    // Marketplace items
+    match /marketplace_items/{itemId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+    
+    // Preliminary leads
+    match /preliminary_leads/{leadId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    // Hotline requests
+    match /hotlineRequests/{requestId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    // Reports
+    match /reports/{reportId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    // Rooms
+    match /rooms/{roomId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    // Bookings
+    match /bookings/{bookingId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    // Holds
+    match /holds/{holdId} {
+      allow read, write: if isSignedIn();
+    }
+  }
+}

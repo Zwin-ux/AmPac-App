@@ -15,6 +15,8 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
 import { Channel, Message } from '../types';
+import { API_URL } from '../config';
+import { getFirebaseIdToken } from './brainAuth';
 
 export const chatService = {
     /**
@@ -71,8 +73,8 @@ export const chatService = {
             if (!user) throw new Error("User not authenticated");
 
             const messagesRef = collection(db, 'organizations', orgId, 'channels', channelId, 'messages');
-            
-             // Create message payload
+
+            // Create message payload
             const messageData: Partial<Message> = {
                 channelId,
                 text,
@@ -132,7 +134,7 @@ export const chatService = {
         try {
             const messageRef = doc(db, 'organizations', orgId, 'channels', channelId, 'messages', messageId);
             const messageSnap = await getDoc(messageRef);
-            
+
             if (!messageSnap.exists()) return;
 
             const data = messageSnap.data() as Message;
@@ -140,13 +142,13 @@ export const chatService = {
             const usersReacted = currentReactions[emoji] || [];
 
             if (usersReacted.includes(userId)) {
-                 // Remove reaction
-                 // Note: nested field updates in Firestore can be tricky with dot notation for dynamic keys (emojis)
-                 // We'll replace the specific emoji array.
-                 const newUsers = usersReacted.filter(uid => uid !== userId);
-                 await updateDoc(messageRef, {
+                // Remove reaction
+                // Note: nested field updates in Firestore can be tricky with dot notation for dynamic keys (emojis)
+                // We'll replace the specific emoji array.
+                const newUsers = usersReacted.filter(uid => uid !== userId);
+                await updateDoc(messageRef, {
                     [`reactions.${emoji}`]: newUsers
-                 });
+                });
             } else {
                 // Add reaction
                 await updateDoc(messageRef, {
@@ -154,7 +156,7 @@ export const chatService = {
                 });
             }
         } catch (error) {
-             console.error("Error toggling reaction:", error);
+            console.error("Error toggling reaction:", error);
         }
     },
 
@@ -166,6 +168,65 @@ export const chatService = {
             });
         } catch (error) {
             console.error("Error inviting users:", error);
+            throw error;
+        }
+    },
+
+    /**
+     * Get all chat threads for the current user (Borrower <-> Staff).
+     */
+    getThreads: async () => {
+        try {
+            const token = await getFirebaseIdToken();
+            const res = await fetch(`${API_URL}/chat/threads`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error('Failed to fetch threads');
+            return await res.json();
+        } catch (error) {
+            console.error("Error fetching threads:", error);
+            return [];
+        }
+    },
+
+    /**
+     * Get messages for a specific thread.
+     */
+    getThreadMessages: async (threadId: string) => {
+        try {
+            const token = await getFirebaseIdToken();
+            const res = await fetch(`${API_URL}/chat/threads/${threadId}/messages`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error('Failed to fetch messages');
+            return await res.json();
+        } catch (error) {
+            console.error("Error fetching thread messages:", error);
+            return [];
+        }
+    },
+
+    /**
+     * Send a message to a staff thread.
+     */
+    sendThreadMessage: async (threadId: string, text: string) => {
+        try {
+            const token = await getFirebaseIdToken();
+            const res = await fetch(`${API_URL}/chat/threads/${threadId}/messages`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ text })
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail || 'Failed to send message');
+            }
+            return await res.json();
+        } catch (error) {
+            console.error("Error sending thread message:", error);
             throw error;
         }
     }

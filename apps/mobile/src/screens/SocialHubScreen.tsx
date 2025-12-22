@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, ScrollView, Modal, Alert, Linking, Image } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, ScrollView, Modal, Alert, Linking, Image, KeyboardAvoidingView, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../theme';
@@ -8,11 +8,17 @@ import { getBusinesses } from '../services/network';
 import { getEvents, createEvent } from '../services/events';
 import { feedService } from '../services/feedService';
 import { chatService } from '../services/chatService';
+import { businessService } from '../services/businessService';
 import { Ionicons } from '@expo/vector-icons';
-import { formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { auth } from '../../firebaseConfig';
+import { Timestamp } from 'firebase/firestore';
 import { AMPAC_STAFF, StaffMember } from '../data/staff';
 import AssistantBubble from '../components/AssistantBubble';
+import { useToast } from '../context/ToastContext';
+import EmptyState from '../components/ui/EmptyState';
+import SkeletonLoader from '../components/SkeletonLoader';
+import CommentSection from '../components/CommentSection';
 
 // Components
 import { ChannelList } from '../components/chat/ChannelList';
@@ -30,8 +36,9 @@ type SocialTab = 'feed' | 'chat' | 'network' | 'profile';
 
 export default function SocialHubScreen() {
     const navigation = useNavigation<any>();
+    const { showToast } = useToast();
     const [activeTab, setActiveTab] = useState<SocialTab>('feed');
-    
+
     // --- NETWORK STATE ---
     const [businesses, setBusinesses] = useState<Business[]>([]);
     const [loadingBusinesses, setLoadingBusinesses] = useState(true);
@@ -41,17 +48,32 @@ export default function SocialHubScreen() {
     const [showCreateEventModal, setShowCreateEventModal] = useState(false);
     const [newEvent, setNewEvent] = useState({ title: '', description: '', location: '', date: '' });
     const [creatingEvent, setCreatingEvent] = useState(false);
-    
+
     // --- CHAT STATE ---
     const [showCreateChannel, setShowCreateChannel] = useState(false);
+    const [isCreateChannelMinimized, setIsCreateChannelMinimized] = useState(false);
     const [newChannelName, setNewChannelName] = useState('');
     const [newChannelDesc, setNewChannelDesc] = useState('');
     const [isPrivate, setIsPrivate] = useState(false);
-    
+
     // --- FEED STATE ---
-    const [feedItems, setFeedItems] = useState<FeedPost[]>([]);
+    const [feedItems, setFeedItems] = useState<(FeedPost | Event)[]>([]);
     const [loadingFeed, setLoadingFeed] = useState(false);
-    
+    const [showCreatePost, setShowCreatePost] = useState(false);
+    const [newPostContent, setNewPostContent] = useState('');
+    const [creatingPost, setCreatingPost] = useState(false);
+    const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+
+    // --- JOIN TEAM STATE ---
+    const [showJoinTeam, setShowJoinTeam] = useState(false);
+    const [joinInviteCode, setJoinInviteCode] = useState('');
+    const [joiningTeam, setJoiningTeam] = useState(false);
+
+    // --- NEW BUSINESS STATE ---
+    const [showCreateBusiness, setShowCreateBusiness] = useState(false);
+    const [newBusiness, setNewBusiness] = useState({ name: '', industry: '', bio: '' });
+    const [creatingBusiness, setCreatingBusiness] = useState(false);
+
     // --- SHARED STATE ---
     const [refreshing, setRefreshing] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -76,7 +98,7 @@ export default function SocialHubScreen() {
     const fetchFeed = async () => {
         setLoadingFeed(true);
         try {
-            const data = await feedService.getFeed();
+            const data = await feedService.getAlgorithmicFeed();
             setFeedItems(data);
         } catch (error) {
             console.error('Feed error', error);
@@ -110,27 +132,31 @@ export default function SocialHubScreen() {
     };
 
     const handleCreateEvent = async () => {
-         // ... (Same logic as NetworkScreen)
-         if (!newEvent.title) return;
-         setCreatingEvent(true);
-         try {
-             // Mock create
-             const created: Event = {
-                 id: Date.now().toString(),
-                 title: newEvent.title,
-                 description: newEvent.description,
-                 location: newEvent.location,
-                 date: new Date().toISOString(),
-                 organizerId: auth.currentUser?.uid || 'user',
-                 organizerName: auth.currentUser?.displayName || 'You',
-                 attendees: []
-             };
-             setEvents([...events, created]);
-             setShowCreateEventModal(false);
-             setNewEvent({ title: '', description: '', location: '', date: '' });
-         } finally {
-             setCreatingEvent(false);
-         }
+        if (!newEvent.title) return;
+        setCreatingEvent(true);
+        try {
+            const { Timestamp } = await import('firebase/firestore');
+            const eventDate = typeof newEvent.date === 'string' && newEvent.date
+                ? Timestamp.fromDate(new Date(newEvent.date))
+                : Timestamp.now();
+
+            await createEvent({
+                title: newEvent.title,
+                description: newEvent.description,
+                location: newEvent.location,
+                date: eventDate as any,
+                organizerBusinessId: auth.currentUser?.uid // Default to owner's biz
+            });
+
+            setShowCreateEventModal(false);
+            setNewEvent({ title: '', description: '', location: '', date: '' });
+            fetchEvents();
+            showToast({ message: "Event posted!", type: 'success' });
+        } catch (error) {
+            showToast({ message: "Failed to post event.", type: 'error' });
+        } finally {
+            setCreatingEvent(false);
+        }
     };
 
     const handleCreateChannel = async () => {
@@ -140,43 +166,209 @@ export default function SocialHubScreen() {
         }
         try {
             await chatService.createChannel(
-                'ampac-community', 
-                newChannelName.trim(), 
+                'ampac-community',
+                newChannelName.trim(),
                 isPrivate ? 'private' : 'public',
                 newChannelDesc
             );
             setShowCreateChannel(false);
             setNewChannelName('');
             setNewChannelDesc('');
-            Alert.alert("Success", "Channel created!");
+            showToast({ message: "Community channel created!", type: 'success' });
         } catch (error) {
-            Alert.alert("Error", "Failed to create channel.");
+            console.error('Channel creation error', error);
+            showToast({ message: "Failed to create channel.", type: 'error' });
         }
     };
 
+    const handleCreatePost = async () => {
+        if (!newPostContent.trim()) return;
+        setCreatingPost(true);
+        try {
+            await feedService.createPost(
+                newPostContent.trim(),
+                'announcement',
+                [],
+                'ampac-community'
+            );
+            setShowCreatePost(false);
+            setNewPostContent('');
+            showToast({ message: "Post shared with the community!", type: 'success' });
+        } catch (error) {
+            showToast({ message: "Failed to share post.", type: 'error' });
+        } finally {
+            setCreatingPost(false);
+        }
+    };
+
+    const handleCreateBusiness = async () => {
+        if (!newBusiness.name.trim()) return;
+        setCreatingBusiness(true);
+        try {
+            await businessService.createBusiness(
+                newBusiness.name.trim(),
+                newBusiness.industry.trim(),
+                newBusiness.bio.trim()
+            );
+
+            setShowCreateBusiness(false);
+            setNewBusiness({ name: '', industry: '', bio: '' });
+            fetchBusinesses(true);
+            showToast({ message: "Business group created!", type: 'success' });
+
+            navigation.navigate('BusinessAdmin', { businessId: auth.currentUser?.uid });
+        } catch (error) {
+            showToast({ message: "Failed to create business.", type: 'error' });
+        } finally {
+            setCreatingBusiness(false);
+        }
+    };
+
+    const handleJoinTeam = async () => {
+        if (!joinInviteCode.trim()) return;
+        setJoiningTeam(true);
+        try {
+            await businessService.joinBusiness(joinInviteCode.trim());
+            setShowJoinTeam(false);
+            setJoinInviteCode('');
+            showToast({ message: "Joined business team!", type: 'success' });
+            fetchBusinesses(true);
+        } catch (error: any) {
+            showToast({ message: error.message || "Failed to join team", type: 'error' });
+        } finally {
+            setJoiningTeam(false);
+        }
+    };
+
+    const handleToggleRSVP = async (eventId: string, isJoining: boolean) => {
+        const { toggleRSVP } = await import('../services/events');
+        await toggleRSVP(eventId, isJoining);
+        fetchEvents();
+        showToast({
+            message: isJoining ? "You're attending!" : "RSVP cancelled",
+            type: 'success'
+        });
+    };
+
     // --- RENDER HELPERS ---
-    const renderFeedItem = ({ item }: { item: FeedPost }) => (
-        <View style={styles.card}>
-            <View style={styles.headerRow}>
-                <View style={[styles.avatarStats, { backgroundColor: theme.colors.primary }]}>
-                    <Text style={styles.avatarTextStats}>{item.authorName?.charAt(0) || '?'}</Text>
-                </View>
-                <View>
-                    <Text style={styles.cardTitle}>{item.authorName || 'Unknown'}</Text>
-                    <Text style={styles.cardSubtitle}>{item.type} • {item.createdAt ? formatDistanceToNow(item.createdAt.toDate(), { addSuffix: true }) : ''}</Text>
-                </View>
+    const renderBadges = (badges?: string[]) => {
+        if (!badges || badges.length === 0) return null;
+        return (
+            <View style={{ flexDirection: 'row', marginLeft: 6, gap: 4 }}>
+                {badges.includes('Star Member') && <Ionicons name="star" size={12} color="#FF9800" />}
+                {badges.includes('Top Contributor') && <Ionicons name="trophy" size={12} color="#FFC107" />}
             </View>
-            <Text style={styles.cardBody}>{item.content}</Text>
-            <View style={styles.cardFooter}>
-                <Ionicons name="heart-outline" size={16} color="gray" />
-                <Text style={styles.footerText}>{item.likes?.length || 0}</Text>
+        );
+    };
+
+    const renderFeedItem = ({ item }: { item: FeedPost | Event }) => {
+        if ('date' in item && 'location' in item && 'attendees' in item) {
+            const eventItem = item as Event;
+            return (
+                <View style={styles.card}>
+                    <View style={styles.cardHeader}>
+                        <View style={[styles.avatarStats, { backgroundColor: theme.colors.secondary }]}>
+                            <Ionicons name="calendar" size={20} color="#fff" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Text style={styles.cardTitle}>{eventItem.title}</Text>
+                                {eventItem.pinned && <View style={styles.pinnedBadge}><Ionicons name="pin" size={10} color="#fff" /></View>}
+                                {eventItem.featured && <View style={styles.featuredBadge}><Text style={styles.badgeText}>FEATURED</Text></View>}
+                            </View>
+                            <Text style={styles.cardSubtitle}>
+                                {eventItem.date instanceof Timestamp ? format(eventItem.date.toDate(), 'PPPp') : eventItem.date}
+                            </Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                                <Text style={[styles.cardSubtitle, { fontSize: 10 }]}>by {eventItem.organizerName}</Text>
+                                {renderBadges(eventItem.organizerBadges)}
+                            </View>
+                        </View>
+                    </View>
+                    <Text style={styles.cardBody} numberOfLines={3}>{eventItem.description}</Text>
+                    <View style={styles.cardFooter}>
+                        <Ionicons name="location-outline" size={14} color="#666" />
+                        <Text style={styles.footerText}>{eventItem.location}</Text>
+                        <View style={{ flex: 1 }} />
+                        <TouchableOpacity
+                            style={[styles.attendBtn, eventItem.attendees?.includes(auth.currentUser?.uid || '') && styles.attendBtnActive]}
+                            onPress={() => handleToggleRSVP(eventItem.id, !eventItem.attendees?.includes(auth.currentUser?.uid || ''))}
+                        >
+                            <Text style={[styles.attendBtnText, eventItem.attendees?.includes(auth.currentUser?.uid || '') && styles.attendBtnTextActive]}>
+                                {eventItem.attendees?.includes(auth.currentUser?.uid || '') ? 'Attending' : 'Attend'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                </View >
+            );
+        }
+
+        const feedPostItem = item as FeedPost;
+        return (
+            <View style={styles.card}>
+                <View style={styles.headerRow}>
+                    <View style={[styles.avatarStats, { backgroundColor: theme.colors.primary }]}>
+                        <Text style={styles.avatarTextStats}>{feedPostItem.authorName?.charAt(0) || '?'}</Text>
+                    </View>
+                    <View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Text style={styles.cardTitle}>{feedPostItem.authorName || 'Unknown'}</Text>
+                            {renderBadges(feedPostItem.authorBadges)}
+                            {feedPostItem.pinned && <View style={styles.pinnedBadge}><Ionicons name="pin" size={10} color="#fff" /></View>}
+                            {feedPostItem.featured && <View style={styles.featuredBadge}><Text style={styles.badgeText}>FEATURED</Text></View>}
+                        </View>
+                        <Text style={styles.cardSubtitle}>{feedPostItem.type} • {feedPostItem.createdAt ? formatDistanceToNow(feedPostItem.createdAt.toDate(), { addSuffix: true }) : ''}</Text>
+                    </View>
+                </View>
+                <Text style={styles.cardBody}>{feedPostItem.content}</Text>
+                <View style={styles.cardFooter}>
+                    <TouchableOpacity onPress={() => feedService.toggleLike(feedPostItem.id)}>
+                        <Ionicons
+                            name={feedPostItem.likes?.includes(auth.currentUser?.uid || '') ? 'heart' : 'heart-outline'}
+                            size={16}
+                            color={feedPostItem.likes?.includes(auth.currentUser?.uid || '') ? '#FF5252' : 'gray'}
+                        />
+                    </TouchableOpacity>
+                    <Text style={styles.footerText}>{feedPostItem.likes?.length || 0}</Text>
+                    <TouchableOpacity
+                        onPress={() => {
+                            const newExpanded = new Set(expandedComments);
+                            if (newExpanded.has(feedPostItem.id)) {
+                                newExpanded.delete(feedPostItem.id);
+                            } else {
+                                newExpanded.add(feedPostItem.id);
+                            }
+                            setExpandedComments(newExpanded);
+                        }}
+                        style={{ marginLeft: 12, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                    >
+                        <Ionicons name="chatbubble-outline" size={16} color="gray" />
+                        <Text style={styles.footerText}>{feedPostItem.commentCount || 0}</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* Entrepreneur Discussion Section */}
+                {expandedComments.has(feedPostItem.id) && (
+                    <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
+                        <CommentSection
+                            postId={feedPostItem.id}
+                            postAuthorId={feedPostItem.authorId}
+                            onCommentCountChange={(count) => {
+                                setFeedItems(prev => prev.map(item =>
+                                    'authorId' in item && item.id === feedPostItem.id
+                                        ? { ...item, commentCount: count }
+                                        : item
+                                ));
+                            }}
+                        />
+                    </View>
+                )}
             </View>
-        </View>
-    );
+        );
+    };
 
     const renderNetworkContent = () => {
         let data: any[] = [];
-        // Simple merge for 'all' or filter
         if (networkFilter === 'all' || networkFilter === 'staff') {
             data.push(...staff.map(s => ({ ...s, _type: 'staff' })));
         }
@@ -187,7 +379,6 @@ export default function SocialHubScreen() {
             data.push(...events.map(e => ({ ...e, _type: 'event' })));
         }
 
-        // Filter by search
         if (searchQuery) {
             data = data.filter((d: any) => {
                 const label = d?._type === 'event' ? d.title : d.name;
@@ -195,19 +386,20 @@ export default function SocialHubScreen() {
             });
         }
 
+
         return (
             <FlatList
                 data={data}
-                keyExtractor={(item: any) => item.id}
-                contentContainerStyle={{ padding: 16 }}
+                keyExtractor={(item: any) => `${item._type}-${item.id}`}
+                contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
                 renderItem={({ item }: { item: any }) => (
                     <View style={styles.card}>
                         <View style={styles.headerRow}>
                             <View style={[styles.avatarStats, { backgroundColor: item._type === 'event' ? theme.colors.secondary : theme.colors.surfaceHighlight }]}>
-                                <Ionicons 
-                                    name={item._type === 'event' ? 'calendar' : item._type === 'staff' ? 'person' : 'business'} 
-                                    size={20} 
-                                    color={theme.colors.text} 
+                                <Ionicons
+                                    name={item._type === 'event' ? 'calendar' : item._type === 'staff' ? 'person' : 'business'}
+                                    size={20}
+                                    color={theme.colors.text}
                                 />
                             </View>
                             <View>
@@ -220,19 +412,59 @@ export default function SocialHubScreen() {
                     </View>
                 )}
                 ListHeaderComponent={
-                    <View style={styles.filterRow}>
-                         {['all', 'staff', 'businesses', 'events'].map(f => (
-                             <TouchableOpacity 
-                                key={f} 
-                                style={[styles.filterChip, networkFilter === f && styles.filterChipActive]}
-                                onPress={() => setNetworkFilter(f as any)}
-                             >
-                                 <Text style={[styles.filterText, networkFilter === f && styles.filterTextActive]}>
-                                     {f.charAt(0).toUpperCase() + f.slice(1)}
-                                 </Text>
-                             </TouchableOpacity>
-                         ))}
+                    <View style={{ marginBottom: 16 }}>
+                        <View style={styles.filterRow}>
+                            {['all', 'staff', 'businesses', 'events'].map(f => (
+                                <TouchableOpacity
+                                    key={f}
+                                    style={[styles.filterChip, networkFilter === f && styles.filterChipActive]}
+                                    onPress={() => setNetworkFilter(f as any)}
+                                >
+                                    <Text style={[styles.filterText, networkFilter === f && styles.filterTextActive]}>
+                                        {f.charAt(0).toUpperCase() + f.slice(1)}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                            <TouchableOpacity
+                                style={[styles.joinBtn, { flex: 1 }]}
+                                onPress={() => setShowJoinTeam(true)}
+                            >
+                                <Ionicons name="enter-outline" size={18} color={theme.colors.primary} />
+                                <Text style={styles.joinBtnText}>Join a Team</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.joinBtn, { flex: 1, borderColor: theme.colors.textSecondary }]}
+                                onPress={() => navigation.navigate('BusinessAdmin', { businessId: auth.currentUser?.uid })}
+                            >
+                                <Ionicons name="settings-outline" size={18} color={theme.colors.textSecondary} />
+                                <Text style={[styles.joinBtnText, { color: theme.colors.textSecondary }]}>My Team</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
+                }
+                ListEmptyComponent={
+                    loadingBusinesses ? (
+                        <View style={{ gap: 12, marginTop: 20 }}>
+                            {[1, 2, 3].map(i => (
+                                <View key={i} style={[styles.card, { flexDirection: 'row', gap: 12, alignItems: 'center' }]}>
+                                    <SkeletonLoader width={40} height={40} borderRadius={20} />
+                                    <View style={{ flex: 1, gap: 6 }}>
+                                        <SkeletonLoader width="40%" height={14} />
+                                        <SkeletonLoader width="60%" height={10} />
+                                    </View>
+                                </View>
+                            ))}
+                        </View>
+                    ) : (
+                        <EmptyState
+                            title="Network is Empty"
+                            description={searchQuery ? `No results for "${searchQuery}"` : "Connect with staff and local businesses."}
+                            icon="people-outline"
+                        />
+                    )
                 }
             />
         );
@@ -248,13 +480,13 @@ export default function SocialHubScreen() {
             {/* --- TABS --- */}
             <View style={styles.tabBar}>
                 <TouchableOpacity onPress={() => setActiveTab('feed')} style={[styles.tabItem, activeTab === 'feed' && styles.tabItemActive]}>
-                    <Text style={[styles.tabText, activeTab === 'feed' && styles.tabTextActive]}>Community</Text>
+                    <Text style={[styles.tabText, activeTab === 'feed' && styles.tabTextActive]}>Communities</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setActiveTab('chat')} style={[styles.tabItem, activeTab === 'chat' && styles.tabItemActive]}>
                     <Text style={[styles.tabText, activeTab === 'chat' && styles.tabTextActive]}>Chat</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setActiveTab('network')} style={[styles.tabItem, activeTab === 'network' && styles.tabItemActive]}>
-                    <Text style={[styles.tabText, activeTab === 'network' && styles.tabTextActive]}>Network</Text>
+                    <Text style={[styles.tabText, activeTab === 'network' && styles.tabTextActive]}>Businesses</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setActiveTab('profile')} style={[styles.tabItem, activeTab === 'profile' && styles.tabItemActive]}>
                     <Text style={[styles.tabText, activeTab === 'profile' && styles.tabTextActive]}>Profile</Text>
@@ -268,12 +500,39 @@ export default function SocialHubScreen() {
                         data={feedItems}
                         renderItem={renderFeedItem}
                         keyExtractor={item => item.id}
-                        contentContainerStyle={{ padding: 16 }}
+                        contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
                         refreshing={loadingFeed || refreshing}
                         onRefresh={onRefresh}
+                        ListEmptyComponent={
+                            loadingFeed ? (
+                                <View style={{ gap: 12 }}>
+                                    {[1, 2, 3].map(i => (
+                                        <View key={i} style={styles.card}>
+                                            <View style={[styles.headerRow, { marginBottom: 12 }]}>
+                                                <SkeletonLoader width={40} height={40} borderRadius={20} />
+                                                <View style={{ flex: 1, gap: 6 }}>
+                                                    <SkeletonLoader width="30%" height={14} />
+                                                    <SkeletonLoader width="50%" height={10} />
+                                                </View>
+                                            </View>
+                                            <SkeletonLoader width="100%" height={12} style={{ marginBottom: 6 }} />
+                                            <SkeletonLoader width="80%" height={12} />
+                                        </View>
+                                    ))}
+                                </View>
+                            ) : (
+                                <EmptyState
+                                    title="No Community Posts"
+                                    description="Be the first to share an announcement or ask a question!"
+                                    icon="chatbubbles-outline"
+                                    actionLabel="Create Post"
+                                    onAction={() => setShowCreatePost(true)}
+                                />
+                            )
+                        }
                     />
                 )}
-                
+
                 {activeTab === 'chat' && (
                     <ChannelList orgId="ampac-community" onChannelSelect={handleChannelSelect} />
                 )}
@@ -285,15 +544,41 @@ export default function SocialHubScreen() {
                         <ProfileScreen navigation={navigation} />
                     </View>
                 )}
+
+                {/* --- MINIMIZED CHANNEL BAR --- */}
+                {isCreateChannelMinimized && (
+                    <TouchableOpacity
+                        style={styles.minimizedBar}
+                        onPress={() => {
+                            setIsCreateChannelMinimized(false);
+                            setShowCreateChannel(true);
+                        }}
+                    >
+                        <Ionicons name="chatbubbles" size={20} color="#fff" />
+                        <View style={{ flex: 1, marginLeft: 12 }}>
+                            <Text style={styles.minimizedBarText}>
+                                Drafting: {newChannelName || 'New Channel'}
+                            </Text>
+                        </View>
+                        <Ionicons name="chevron-up" size={20} color="#fff" />
+                    </TouchableOpacity>
+                )}
             </View>
 
-            {/* --- FAB for Create Channel (Only on Chat tab) --- */}
-            {activeTab === 'chat' && (
-                <TouchableOpacity 
-                    style={styles.fab} 
-                    onPress={() => setShowCreateChannel(true)}
+            {/* --- FAB (Contextual) --- */}
+            {(activeTab === 'chat' || activeTab === 'feed' || activeTab === 'network') && (
+                <TouchableOpacity
+                    style={styles.fab}
+                    onPress={() => {
+                        if (activeTab === 'chat') setShowCreateChannel(true);
+                        if (activeTab === 'feed') setShowCreatePost(true);
+                        if (activeTab === 'network') setShowCreateBusiness(true);
+                    }}
                 >
                     <Ionicons name="add" size={24} color="#fff" />
+                    <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
+                        {activeTab === 'chat' ? 'CHAT' : activeTab === 'feed' ? 'POST' : 'BIZ'}
+                    </Text>
                 </TouchableOpacity>
             )}
 
@@ -304,48 +589,223 @@ export default function SocialHubScreen() {
                 animationType="slide"
                 onRequestClose={() => setShowCreateChannel(false)}
             >
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.modalOverlay}
+                >
+                    <View style={styles.modalContent}>
+                        <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
+                            <View style={styles.modalHeader}>
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setShowCreateChannel(false);
+                                        setIsCreateChannelMinimized(true);
+                                    }}
+                                    style={styles.headerIconButton}
+                                >
+                                    <Ionicons name="chevron-down-circle" size={32} color={theme.colors.primary} />
+                                    <Text style={styles.minimizeText}>Minimize</Text>
+                                </TouchableOpacity>
+                                <Text style={styles.modalTitle}>New Channel</Text>
+                                <View style={{ width: 60 }} />
+                            </View>
+
+                            <TextInput
+                                style={styles.modalInput}
+                                placeholder="Channel Name (e.g. #marketing)"
+                                value={newChannelName}
+                                onChangeText={setNewChannelName}
+                                autoCapitalize="none"
+                            />
+
+                            <TextInput
+                                style={[styles.modalInput, styles.modalTextArea]}
+                                placeholder="Description (Optional)"
+                                value={newChannelDesc}
+                                onChangeText={setNewChannelDesc}
+                                multiline
+                            />
+
+                            <View style={styles.privacyRow}>
+                                <Text style={styles.modalLabel}>Private Channel?</Text>
+                                <TouchableOpacity onPress={() => setIsPrivate(!isPrivate)}>
+                                    <Ionicons
+                                        name={isPrivate ? "checkbox" : "square-outline"}
+                                        size={24}
+                                        color={theme.colors.primary}
+                                    />
+                                </TouchableOpacity>
+                            </View>
+
+                            <View style={styles.modalButtons}>
+                                <TouchableOpacity onPress={() => setShowCreateChannel(false)} style={styles.modalButtonCancel}>
+                                    <Text style={styles.modalButtonTextCancel}>Cancel</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={handleCreateChannel} style={styles.modalButtonPrimary}>
+                                    <Text style={styles.modalButtonTextPrimary}>Create</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </ScrollView>
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
+
+            {/* Join Team Modal */}
+            <Modal
+                visible={showJoinTeam}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setShowJoinTeam(false)}
+            >
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>New Channel</Text>
-                        
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Join a Business Team</Text>
+                            <TouchableOpacity onPress={() => setShowJoinTeam(false)}>
+                                <Ionicons name="close" size={24} color={theme.colors.text} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={styles.modalSubtitle}>
+                            Enter the invite code shared by the business owner.
+                        </Text>
+
                         <TextInput
                             style={styles.modalInput}
-                            placeholder="Channel Name (e.g. #marketing)"
-                            value={newChannelName}
-                            onChangeText={setNewChannelName}
-                            autoCapitalize="none"
-                        />
-                        
-                        <TextInput
-                            style={[styles.modalInput, styles.modalTextArea]}
-                            placeholder="Description (Optional)"
-                            value={newChannelDesc}
-                            onChangeText={setNewChannelDesc}
-                            multiline
+                            placeholder="Invite Code (e.g. ABC123)"
+                            value={joinInviteCode}
+                            onChangeText={(text) => setJoinInviteCode(text.toUpperCase())}
+                            autoCapitalize="characters"
                         />
 
-                        <View style={styles.privacyRow}>
-                            <Text>Private Channel?</Text>
-                             {/* Simple Switch substitute */}
-                            <TouchableOpacity onPress={() => setIsPrivate(!isPrivate)}>
-                                <Ionicons 
-                                    name={isPrivate ? "checkbox" : "square-outline"} 
-                                    size={24} 
-                                    color={theme.colors.primary} 
-                                />
-                            </TouchableOpacity>
-                        </View>
-
-                        <View style={styles.modalButtons}>
-                            <TouchableOpacity onPress={() => setShowCreateChannel(false)} style={styles.modalButtonCancel}>
-                                <Text style={styles.modalButtonTextCancel}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={handleCreateChannel} style={styles.modalButtonPrimary}>
-                                <Text style={styles.modalButtonTextPrimary}>Create</Text>
-                            </TouchableOpacity>
-                        </View>
+                        <TouchableOpacity
+                            style={[styles.submitBtn, (!joinInviteCode.trim() || joiningTeam) && styles.submitBtnDisabled]}
+                            onPress={handleJoinTeam}
+                            disabled={!joinInviteCode.trim() || joiningTeam}
+                        >
+                            {joiningTeam ? (
+                                <ActivityIndicator color="#fff" />
+                            ) : (
+                                <Text style={styles.submitBtnText}>Join Team</Text>
+                            )}
+                        </TouchableOpacity>
                     </View>
                 </View>
+            </Modal>
+
+            {/* --- CREATE POST MODAL --- */}
+            <Modal
+                visible={showCreatePost}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setShowCreatePost(false)}
+            >
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.modalOverlay}
+                >
+                    <View style={styles.modalContent}>
+                        <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
+                            <View style={styles.modalHeader}>
+                                <TouchableOpacity
+                                    onPress={() => setShowCreatePost(false)}
+                                    style={styles.headerIconButton}
+                                >
+                                    <Ionicons name="close-circle" size={32} color={theme.colors.primary} />
+                                    <Text style={styles.minimizeText}>Close</Text>
+                                </TouchableOpacity>
+                                <Text style={styles.modalTitle}>New Post</Text>
+                                <View style={{ width: 60 }} />
+                            </View>
+
+                            <TextInput
+                                style={[styles.modalInput, styles.modalTextArea, { minHeight: 120 }]}
+                                placeholder="What's on your mind?"
+                                value={newPostContent}
+                                onChangeText={setNewPostContent}
+                                multiline
+                                autoFocus
+                            />
+
+                            <View style={styles.modalButtons}>
+                                <TouchableOpacity onPress={() => setShowCreatePost(false)} style={styles.modalButtonCancel}>
+                                    <Text style={styles.modalButtonTextCancel}>Cancel</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    onPress={handleCreatePost}
+                                    style={[styles.modalButtonPrimary, (!newPostContent.trim() || creatingPost) && { opacity: 0.5 }]}
+                                    disabled={!newPostContent.trim() || creatingPost}
+                                >
+                                    {creatingPost ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalButtonTextPrimary}>Post</Text>}
+                                </TouchableOpacity>
+                            </View>
+                        </ScrollView>
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
+
+            {/* --- CREATE BUSINESS MODAL --- */}
+            <Modal
+                visible={showCreateBusiness}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setShowCreateBusiness(false)}
+            >
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={styles.modalOverlay}
+                >
+                    <View style={styles.modalContent}>
+                        <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
+                            <View style={styles.modalHeader}>
+                                <TouchableOpacity
+                                    onPress={() => setShowCreateBusiness(false)}
+                                    style={styles.headerIconButton}
+                                >
+                                    <Ionicons name="close-circle" size={32} color={theme.colors.primary} />
+                                    <Text style={styles.minimizeText}>Close</Text>
+                                </TouchableOpacity>
+                                <Text style={styles.modalTitle}>List Your Business</Text>
+                                <View style={{ width: 60 }} />
+                            </View>
+
+                            <TextInput
+                                style={styles.modalInput}
+                                placeholder="Business Name"
+                                value={newBusiness.name}
+                                onChangeText={(val) => setNewBusiness({ ...newBusiness, name: val })}
+                            />
+
+                            <TextInput
+                                style={styles.modalInput}
+                                placeholder="Industry (e.g. Retail)"
+                                value={newBusiness.industry}
+                                onChangeText={(val) => setNewBusiness({ ...newBusiness, industry: val })}
+                            />
+
+                            <TextInput
+                                style={[styles.modalInput, styles.modalTextArea]}
+                                placeholder="Short Bio / Description"
+                                value={newBusiness.bio}
+                                onChangeText={(val) => setNewBusiness({ ...newBusiness, bio: val })}
+                                multiline
+                            />
+
+                            <View style={styles.modalButtons}>
+                                <TouchableOpacity onPress={() => setShowCreateBusiness(false)} style={styles.modalButtonCancel}>
+                                    <Text style={styles.modalButtonTextCancel}>Cancel</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    onPress={handleCreateBusiness}
+                                    style={[styles.modalButtonPrimary, (!newBusiness.name.trim() || creatingBusiness) && { opacity: 0.5 }]}
+                                    disabled={!newBusiness.name.trim() || creatingBusiness}
+                                >
+                                    {creatingBusiness ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalButtonTextPrimary}>Create</Text>}
+                                </TouchableOpacity>
+                            </View>
+                        </ScrollView>
+                    </View>
+                </KeyboardAvoidingView>
             </Modal>
         </SafeAreaView>
     );
@@ -549,4 +1009,127 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontWeight: 'bold',
     },
+    modalLabel: {
+        fontSize: 14,
+        color: theme.colors.text,
+        fontWeight: 'bold',
+    },
+    // Minimization Styles
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 16,
+    },
+    headerIconButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 4,
+        gap: 4,
+    },
+    minimizeText: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: theme.colors.primary,
+    },
+    minimizedBar: {
+        position: 'absolute',
+        bottom: 20,
+        left: 16,
+        right: 16,
+        backgroundColor: theme.colors.primary,
+        borderRadius: 12,
+        padding: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        ...theme.shadows.card,
+        zIndex: 1100,
+    },
+    minimizedBarText: {
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 14,
+    },
+    submitBtn: {
+        backgroundColor: theme.colors.primary,
+        borderRadius: 8,
+        padding: 14,
+        alignItems: 'center',
+        marginTop: 10,
+    },
+    submitBtnDisabled: {
+        backgroundColor: theme.colors.textSecondary,
+        opacity: 0.7,
+    },
+    submitBtnText: {
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 16,
+    },
+    joinBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: theme.colors.primary,
+        backgroundColor: '#fff',
+        marginTop: 8,
+    },
+    joinBtnText: {
+        marginLeft: 8,
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: theme.colors.primary,
+    },
+    modalSubtitle: {
+        ...theme.typography.body,
+        color: theme.colors.textSecondary,
+        marginBottom: 20,
+        textAlign: 'center',
+    },
+    cardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    attendBtn: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: theme.colors.secondary,
+        backgroundColor: '#fff',
+    },
+    attendBtnActive: {
+        backgroundColor: theme.colors.secondary,
+    },
+    attendBtnText: {
+        fontSize: 13,
+        fontWeight: 'bold',
+        color: theme.colors.secondary,
+    },
+    attendBtnTextActive: {
+        color: '#fff',
+    },
+    featuredBadge: {
+        backgroundColor: theme.colors.primary,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+        marginLeft: 8,
+    },
+    pinnedBadge: {
+        backgroundColor: '#FF6B6B',
+        padding: 4,
+        borderRadius: 12,
+        marginLeft: 6,
+    },
+    badgeText: {
+        color: '#fff',
+        fontSize: 8,
+        fontWeight: 'bold',
+    }
 });

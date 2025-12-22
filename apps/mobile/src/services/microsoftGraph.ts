@@ -248,4 +248,32 @@ export const graphCalendarService = {
             return { roomId, refreshedAt: Date.now(), usedGraph: false };
         }
     },
+
+    async getUserProfile() {
+        const token = await ensureAccessToken();
+        if (!token) return null;
+
+        try {
+            const response = await fetch(`${GRAPH_BASE}/me`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!response.ok) throw new Error('Failed to fetch profile');
+            return await response.json();
+        } catch (error) {
+            console.warn('Graph profile fetch failed', error);
+            return null;
+        }
+    },
+
+    async checkConnectionStatus() {
+        const cached = await loadCachedToken();
+        if (cached && !isExpired(cached.expiresAt)) {
+            return true;
+        }
+        // If expired but has refresh token, consider connected (will auto-refresh on use)
+        if (cached && cached.refreshToken) {
+            return true;
+        }
+        return false;
+    }
 };

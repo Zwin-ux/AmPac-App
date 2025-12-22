@@ -64,7 +64,8 @@ export default function HomeScreen() {
         { label: 'Book Space', icon: 'calendar', color: '#2E7D32', background: '#E8F5E9', screen: 'Spaces' },
         { label: 'Payments', icon: 'card', color: '#1565C0', background: '#E3F2FD', screen: 'Payment' },
         { label: 'Marketplace', icon: 'bag-handle', color: '#1F2937', background: '#F3F4F6', screen: 'Marketplace' },
-        { label: 'Network', icon: 'people', color: '#7B1FA2', background: '#F3E5F5', screen: 'Network' },
+        { label: 'Communities', icon: 'people-circle', color: '#E65100', background: '#FFF3E0', screen: 'Social' },
+        { label: 'Businesses', icon: 'people', color: '#7B1FA2', background: '#F3E5F5', screen: 'Network' },
     ];
 
     return (
@@ -121,12 +122,34 @@ export default function HomeScreen() {
                             </View>
                             <Ionicons name="rocket" size={48} color="rgba(255,255,255,0.2)" />
                         </View>
-                        <Button 
-                            title="Start Application" 
+                        <Button
+                            title="Start Application"
                             onPress={() => navigation.navigate('Apply')}
                             style={{ backgroundColor: 'white' }}
                             textStyle={{ color: theme.colors.primary, fontWeight: 'bold' }}
                         />
+                    </Card>
+                )}
+
+                {/* --- PRELIMINARY INTEREST CARD --- */}
+                {!activeApplication && (
+                    <Card style={styles.interestCard}>
+                        <View style={styles.interestContent}>
+                            <View style={styles.interestText}>
+                                <Text style={styles.interestTitle}>Early Eligibility Check</Text>
+                                <Text style={styles.interestDesc}>Not ready for a full application? See if you qualify in 2 minutes.</Text>
+                            </View>
+                            <View style={styles.interestIcon}>
+                                <Ionicons name="speedometer" size={32} color={theme.colors.primary} />
+                            </View>
+                        </View>
+                        <TouchableOpacity
+                            style={styles.interestBtn}
+                            onPress={() => navigation.navigate('PreliminaryIntake')}
+                        >
+                            <Text style={styles.interestBtnText}>Check My Score</Text>
+                            <Ionicons name="chevron-forward" size={18} color={theme.colors.primary} />
+                        </TouchableOpacity>
                     </Card>
                 )}
 
@@ -300,5 +323,54 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: 'rgba(255,255,255,0.9)',
         lineHeight: 20,
+    },
+    interestCard: {
+        marginBottom: theme.spacing.xl,
+        padding: theme.spacing.lg,
+        borderWidth: 1,
+        borderColor: theme.colors.primary,
+        backgroundColor: '#fff',
+    },
+    interestContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    interestText: {
+        flex: 1,
+        marginRight: 12,
+    },
+    interestTitle: {
+        fontSize: 18,
+        fontWeight: '900',
+        color: theme.colors.text,
+        marginBottom: 4,
+    },
+    interestDesc: {
+        fontSize: 13,
+        color: theme.colors.textSecondary,
+        lineHeight: 18,
+    },
+    interestIcon: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: '#f0f4ff',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    interestBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 12,
+        backgroundColor: '#f0f4ff',
+        borderRadius: 8,
+        gap: 8,
+    },
+    interestBtnText: {
+        color: theme.colors.primary,
+        fontWeight: 'bold',
+        fontSize: 15,
     },
 });

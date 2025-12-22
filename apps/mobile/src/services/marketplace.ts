@@ -25,7 +25,7 @@ const FALLBACK_ITEMS: MarketplaceItem[] = [
         title: 'Ecredable Business Credit Lift',
         description: 'Build business credit and strengthen your profile.',
         category: 'Credit',
-        url: 'https://business.ecredable.com/ampac',
+        // url: 'https://business.ecredable.com/ampac', // Temporarily disabled - link not active
         badge: 'Partner',
         priceLabel: 'Partner pricing',
         featured: true,

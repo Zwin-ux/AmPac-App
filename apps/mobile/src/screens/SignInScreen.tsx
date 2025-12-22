@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Image } from 'react-native';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInAnonymously } from 'firebase/auth';
 import { useNavigation } from '@react-navigation/native';
 import { auth } from '../../firebaseConfig';
 import { theme } from '../theme';
@@ -44,8 +44,11 @@ export default function SignInScreen() {
             const { Timestamp } = await import('firebase/firestore');
             const { userStore } = await import('../services/userStore');
 
+            // 1. Sign in anonymously to get a valid Firebase session
+            const { user } = await signInAnonymously(auth);
+
             const demoProfile = {
-                uid: 'demo-user-123',
+                uid: user.uid, // Use the real anonymous uid
                 role: 'entrepreneur',
                 fullName: 'Alex Rivera',
                 businessName: 'Rivera Innovations',
@@ -57,7 +60,7 @@ export default function SignInScreen() {
                 createdAt: Timestamp.now(),
             };
 
-            userStore.setDemoUser(demoProfile as any);
+            await userStore.setUser(demoProfile as any);
         } catch (err: any) {
             console.error('Demo Error:', err);
             setError({

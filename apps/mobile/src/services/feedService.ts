@@ -10,12 +10,14 @@ import {
     doc,
     arrayUnion,
     arrayRemove,
-    startAfter,
     getDocs,
-    getDoc
+    getDoc,
+    where,
+    Timestamp
 } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
-import { FeedPost } from '../types';
+import { FeedPost, Event } from '../types';
+import { getEvents } from './events';
 
 export const feedService = {
     /**
@@ -43,16 +45,26 @@ export const feedService = {
             if (!user) throw new Error("User not authenticated");
 
             const postsRef = collection(db, 'posts');
+
+            // Fetch user profile to get badges
+            const userSnap = await getDoc(doc(db, 'users', user.uid));
+            const userData = userSnap.exists() ? userSnap.data() : {};
+            const badges = userData.badges || [];
+
             const newPost: Partial<FeedPost> = {
                 authorId: user.uid,
                 authorName: user.displayName || 'AmPac User',
-                authorAvatar: user.photoURL || undefined,
+                ...(user.photoURL && { authorAvatar: user.photoURL }), // Only include if exists
+                authorBadges: badges,
                 orgId,
                 content,
                 mediaUrls,
                 likes: [],
                 commentCount: 0,
                 type,
+                engagementScore: 0,
+                featured: false,
+                pinned: false,
                 createdAt: serverTimestamp() as any
             };
 
@@ -67,20 +79,12 @@ export const feedService = {
     toggleLike: async (postId: string) => {
         try {
             const user = auth.currentUser;
-            if (!user) return; // Silent fail if not logged in
+            if (!user) return;
 
             const postRef = doc(db, 'posts', postId);
-            // We don't read first to save a readOp, we can just try to use arrayUnion/Remove if we knew state.
-            // But to toggle, we need to know if we liked it.
-            // For UI responsiveness, UI usually passes current state. 
-            // Here we'll just check specific document cache or read it.
-            // Optimization: The UI calling this likely has the 'post' object.
-            // But services should be robust.
-            
-            // Let's implement a safe toggle using getDoc for now.
             const snap = await getDoc(postRef);
             if (!snap.exists()) return;
-            
+
             const post = snap.data() as FeedPost;
             const hasLiked = post.likes && post.likes.includes(user.uid);
 
@@ -99,12 +103,50 @@ export const feedService = {
         }
     },
 
-    // Kept for backward compatibility if needed, but updated signatures
     getFeed: async (): Promise<FeedPost[]> => {
-        // One-off fetch
         const postsRef = collection(db, 'posts');
         const q = query(postsRef, orderBy('createdAt', 'desc'), limit(20));
         const snap = await getDocs(q);
         return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FeedPost));
+    },
+
+    computeEngagementScore: (item: FeedPost | Event): number => {
+        const likes = (item as FeedPost).likes?.length || 0;
+        const comments = (item as FeedPost).commentCount || 0;
+        const featuredBoost = (item as FeedPost).featured ? 100 : 0;
+        const pinnedBoost = (item as FeedPost).pinned ? 500 : 0;
+
+        // Time decay: Score = (L + C*2 + 1) / (Hours + 2)^1.5
+        const createdAt = item.createdAt instanceof Timestamp ? item.createdAt.toDate() : new Date();
+        const hoursOld = (Date.now() - createdAt.getTime()) / 3600000;
+
+        const baseScore = (likes + comments * 2 + 1) / Math.pow(hoursOld + 2, 1.5);
+        return baseScore + featuredBoost + pinnedBoost;
+    },
+
+    getAlgorithmicFeed: async (): Promise<(FeedPost | Event)[]> => {
+        try {
+            // Fetch posts and events in parallel
+            const [postsSnapshot, events] = await Promise.all([
+                getDocs(query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(50))),
+                getEvents()
+            ]);
+
+            const posts = postsSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            } as FeedPost));
+
+            const combined: (FeedPost | Event)[] = [...posts, ...events];
+
+            return combined.sort((a, b) => {
+                const scoreA = feedService.computeEngagementScore(a);
+                const scoreB = feedService.computeEngagementScore(b);
+                return scoreB - scoreA;
+            });
+        } catch (error) {
+            console.error("Error fetching algorithmic feed:", error);
+            return [];
+        }
     }
 };

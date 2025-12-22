@@ -6,7 +6,8 @@ from app.services.sync_service import SyncService
 from fastapi.staticfiles import StaticFiles
 from app.api.routers import chat, documents, agents, knowledge, ventures, calendar, assistant, health, support
 from app.core.logging_config import init_logging
-from app.core.middleware import RequestContextMiddleware
+from app.core.logging_config import init_logging
+from app.core.middleware import RequestContextMiddleware, RateLimitingMiddleware
 
 settings = get_settings()
 init_logging()
@@ -20,8 +21,7 @@ app = FastAPI(
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "*",
+    allow_origins=settings.ALLOWED_CORS_ORIGINS + [
         "https://outlook.office.com",
         "https://outlook.office365.com",
         "https://teams.microsoft.com",
@@ -36,6 +36,7 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 app.add_middleware(RequestContextMiddleware)
+app.add_middleware(RateLimitingMiddleware)
 
 @app.on_event("startup")
 async def startup_event():

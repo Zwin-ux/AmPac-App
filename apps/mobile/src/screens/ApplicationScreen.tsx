@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity, Linking, TextInput } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../theme';
 import { applicationStore, ApplicationStoreState } from '../services/applicationStore';
@@ -8,15 +9,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { LoanStatusTracker } from '../components/LoanStatusTracker';
+import { supportNotificationService } from '../services/supportNotificationService';
 
 const PORTAL_URL = 'https://ampac.gatewayportal.com/';
-const PARTNER_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfxX4YBsYJ8W6jOUb1to2pjhvvUFCxA80oRxhwm8_mrdisSTg/viewform';
 
 export default function ApplicationScreen() {
+    const navigation = useNavigation();
     // OPTIMISTIC: No blocking loading state - render immediately
     const [application, setApplication] = useState<Application | null>(() => applicationStore.getCachedDraft());
     const [syncStatus, setSyncStatus] = useState<SyncStatus>(applicationStore.getSyncStatus());
-    
+
     // Pre-Qual State
     const [step, setStep] = useState<'intro' | 'questions' | 'eligible' | 'ineligible'>('intro');
     const [answers, setAnswers] = useState({
@@ -44,14 +46,6 @@ export default function ApplicationScreen() {
         }
     };
 
-    const handleOpenPartnerForm = async () => {
-        const supported = await Linking.canOpenURL(PARTNER_FORM_URL);
-        if (supported) {
-            await Linking.openURL(PARTNER_FORM_URL);
-        } else {
-            Alert.alert("Error", "Cannot open the partner program link.");
-        }
-    };
 
     const evaluateEligibility = () => {
         const issues: string[] = [];
@@ -89,12 +83,12 @@ export default function ApplicationScreen() {
                     <Ionicons name="rocket-outline" size={64} color={theme.colors.primary} style={{ marginBottom: 20 }} />
                     <Text style={styles.title}>Instant Application</Text>
                     <Text style={styles.subtitle}>
-                        Get pre-qualified for an SBA 504 or Community Loan in minutes. 
+                        Get pre-qualified for an SBA 504 or Community Loan in minutes.
                         We just need to ask a few preliminary questions.
                     </Text>
-                    <Button 
-                        title="Start Pre-Check" 
-                        onPress={() => setStep('questions')} 
+                    <Button
+                        title="Start Pre-Check"
+                        onPress={() => setStep('questions')}
                         style={styles.mainButton}
                     />
                 </View>
@@ -105,19 +99,19 @@ export default function ApplicationScreen() {
             return (
                 <ScrollView contentContainerStyle={styles.scrollContent}>
                     <Text style={styles.sectionTitle}>Preliminary Check</Text>
-                    
+
                     <Card style={styles.questionCard}>
                         <Text style={styles.questionLabel}>Are you the business owner?</Text>
                         <View style={styles.row}>
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 style={[styles.choiceBtn, answers.isOwner === true && styles.choiceBtnActive]}
-                                onPress={() => setAnswers({...answers, isOwner: true})}
+                                onPress={() => setAnswers({ ...answers, isOwner: true })}
                             >
                                 <Text style={[styles.choiceText, answers.isOwner === true && styles.choiceTextActive]}>Yes</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 style={[styles.choiceBtn, answers.isOwner === false && styles.choiceBtnActive]}
-                                onPress={() => setAnswers({...answers, isOwner: false})}
+                                onPress={() => setAnswers({ ...answers, isOwner: false })}
                             >
                                 <Text style={[styles.choiceText, answers.isOwner === false && styles.choiceTextActive]}>No</Text>
                             </TouchableOpacity>
@@ -126,35 +120,35 @@ export default function ApplicationScreen() {
 
                     <Card style={styles.questionCard}>
                         <Text style={styles.questionLabel}>Estimated Loan Amount ($)</Text>
-                        <TextInput 
+                        <TextInput
                             style={styles.input}
                             placeholder="e.g. 500000"
                             keyboardType="numeric"
                             value={answers.amount}
-                            onChangeText={(t) => setAnswers({...answers, amount: t})}
+                            onChangeText={(t) => setAnswers({ ...answers, amount: t })}
                         />
                     </Card>
 
                     <Card style={styles.questionCard}>
                         <Text style={styles.questionLabel}>Years in Business</Text>
-                        <TextInput 
+                        <TextInput
                             style={styles.input}
                             placeholder="e.g. 3"
                             keyboardType="numeric"
                             value={answers.years}
-                            onChangeText={(t) => setAnswers({...answers, years: t})}
+                            onChangeText={(t) => setAnswers({ ...answers, years: t })}
                         />
                     </Card>
 
-                    <Button 
-                        title="Check Eligibility" 
+                    <Button
+                        title="Check Eligibility"
                         onPress={() => {
                             if (answers.isOwner === null || !answers.amount || !answers.years) {
                                 Alert.alert("Missing Info", "Please answer all questions.");
                                 return;
                             }
                             evaluateEligibility();
-                        }} 
+                        }}
                         style={styles.mainButton}
                     />
                 </ScrollView>
@@ -170,9 +164,13 @@ export default function ApplicationScreen() {
                         Based on your answers, you are a great candidate for AmPac financing.
                         Please complete your full application on our secure portal.
                     </Text>
-                    <Button 
-                        title="Continue to Secure Portal" 
-                        onPress={handleOpenPortal} 
+                    <Button
+                        title="Continue to Secure Portal"
+                        onPress={async () => {
+                            // Notify support team
+                            await supportNotificationService.notifyApplicationStarted();
+                            handleOpenPortal();
+                        }}
                         style={styles.portalButton}
                         textStyle={{ fontSize: 18, fontWeight: 'bold' }}
                     />
@@ -189,7 +187,7 @@ export default function ApplicationScreen() {
                     <Ionicons name="close-circle" size={72} color={theme.colors.error} style={{ marginBottom: 20 }} />
                     <Text style={styles.title}>We can’t proceed right now</Text>
                     <Text style={styles.subtitle}>
-                        Based on your answers, this application doesn’t fit our current program. You can connect with our partners for other options.
+                        Based on your answers, this application doesn’t fit our current program. Please connect with our support team to explore other options or get guidance on your next steps.
                     </Text>
                     {reasons.length > 0 && (
                         <View style={styles.reasonCard}>
@@ -199,13 +197,17 @@ export default function ApplicationScreen() {
                         </View>
                     )}
                     <Button
-                        title="View Partner Resources"
-                        onPress={handleOpenPartnerForm}
+                        title="Connect with Support"
+                        onPress={async () => {
+                            // Notify support team with denial reasons
+                            await supportNotificationService.notifyApplicationDenied(reasons.join('; '));
+                            navigation.navigate('Support' as never);
+                        }}
                         style={styles.portalButton}
-                        textStyle={{ fontSize: 16, fontWeight: '700' }}
+                        textStyle={{ fontSize: 18, fontWeight: 'bold' }}
                     />
-                    <TouchableOpacity onPress={() => setStep('intro')} style={{ marginTop: 16 }}>
-                        <Text style={{ color: theme.colors.textSecondary }}>Start Over</Text>
+                    <TouchableOpacity onPress={() => setStep('intro')} style={{ marginTop: 24 }}>
+                        <Text style={{ color: theme.colors.textSecondary, fontSize: 16 }}>Start Over</Text>
                     </TouchableOpacity>
                 </View>
             );
@@ -223,17 +225,17 @@ export default function ApplicationScreen() {
             {application && application.status !== 'draft' ? (
                 <ScrollView contentContainerStyle={styles.scrollContent}>
                     <Text style={styles.sectionTitle}>Current Application</Text>
-                    <LoanStatusTracker 
-                        status={application.status} 
-                        venturesStatus={application.venturesStatus} 
+                    <LoanStatusTracker
+                        status={application.status}
+                        venturesStatus={application.venturesStatus}
                     />
                     <Card style={{ marginTop: 20, padding: 20 }}>
                         <Text style={styles.infoText}>
                             Your application is being processed. You can view more details or upload additional documents on our web portal.
                         </Text>
-                        <Button 
-                            title="Go to Web Portal" 
-                            onPress={handleOpenPortal} 
+                        <Button
+                            title="Go to Web Portal"
+                            onPress={handleOpenPortal}
                             variant="secondary"
                             style={{ marginTop: 15 }}
                         />
@@ -282,7 +284,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: theme.colors.textSecondary,
         textAlign: 'center',
-        marginBottom: 30,
+        marginBottom: 20,
         lineHeight: 24,
     },
     reasonCard: {
@@ -316,7 +318,7 @@ const styles = StyleSheet.create({
     },
     questionCard: {
         padding: 20,
-        marginBottom: 20,
+        marginBottom: 12,
     },
     questionLabel: {
         fontSize: 16,

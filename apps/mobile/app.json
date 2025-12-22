@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "AmPac Mobile",
+    "slug": "ampac-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -15,12 +15,14 @@
     },
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.ampac.app",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "This app uses the photo library to let you upload profile pictures and share images in chat.",
         "NSCameraUsageDescription": "This app uses the camera to let you take profile pictures and share photos in chat."
       }
     },
     "android": {
+      "package": "com.ampac.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -35,7 +37,7 @@
       "expo-font"
     ],
     "extra": {
-      "graphClientId": "ENTER_GRAPH_CLIENT_ID",
+      "graphClientId": "PROVIDE_AT_BUILD_TIME",
       "graphTenantId": "common",
       "graphUseProxy": true,
       "graphScopes": [

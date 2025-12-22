@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Alert, StyleSheet, SafeAreaView, ScrollView, TextInput, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { feedService } from '../services/feedService';
+import { notificationService } from '../services/notificationService';
 import { auth } from '../../firebaseConfig';
 import type { FeedPost } from '../types';
+import CommentSection from '../components/CommentSection';
 
 const primaryBlue = "#0064A6";
 
@@ -12,6 +14,7 @@ export default function FeedScreen({ navigation }: any) {
     const [feedItems, setFeedItems] = useState<FeedPost[]>([]);
     const [newPostContent, setNewPostContent] = useState('');
     const [creatingPost, setCreatingPost] = useState(false);
+    const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         const unsubscribe = feedService.subscribeToFeed(50, (posts) => {
@@ -47,6 +50,17 @@ export default function FeedScreen({ navigation }: any) {
                 return;
             }
             await feedService.toggleLike(postId);
+
+            // Send like notification
+            const post = feedItems.find(p => p.id === postId);
+            if (post && post.authorId !== uid) {
+                await notificationService.sendLikeNotification(
+                    post.authorId,
+                    auth.currentUser?.displayName || 'Someone',
+                    postId
+                );
+            }
+
             setFeedItems((prev) =>
                 prev.map((item) => {
                     if (item.id !== postId) return item;
@@ -144,10 +158,10 @@ export default function FeedScreen({ navigation }: any) {
                                         <View style={styles.userDetails}>
                                             <Text style={styles.userName}>{item.authorName}</Text>
                                             <View style={styles.postMeta}>
-                                                <Ionicons 
-                                                    name={getPostTypeIcon(item.type).name as any} 
-                                                    size={14} 
-                                                    color={getPostTypeIcon(item.type).color} 
+                                                <Ionicons
+                                                    name={getPostTypeIcon(item.type).name as any}
+                                                    size={14}
+                                                    color={getPostTypeIcon(item.type).color}
                                                     style={{ marginRight: 4 }}
                                                 />
                                                 <Text style={styles.postType}>{item.type}</Text>
@@ -159,20 +173,55 @@ export default function FeedScreen({ navigation }: any) {
                                     </View>
                                 </View>
                                 <Text style={styles.postContent}>{item.content}</Text>
-                                
+
                                 <View style={styles.postActions}>
-                                    <TouchableOpacity style={styles.actionButton} onPress={() => handleLikePost(item.id)}>
-                                        <Ionicons name="heart-outline" size={18} color="#64748B" />
+                                    <TouchableOpacity
+                                        style={styles.actionButton}
+                                        onPress={() => handleLikePost(item.id)}
+                                    >
+                                        <Ionicons
+                                            name={item.likes?.includes(auth.currentUser?.uid || '') ? 'heart' : 'heart-outline'}
+                                            size={18}
+                                            color={item.likes?.includes(auth.currentUser?.uid || '') ? '#FF5252' : '#64748B'}
+                                        />
                                         <Text style={styles.actionText}>{item.likes?.length || 0}</Text>
                                     </TouchableOpacity>
-                                    <TouchableOpacity style={styles.actionButton}>
+                                    <TouchableOpacity
+                                        style={styles.actionButton}
+                                        onPress={() => {
+                                            const newExpanded = new Set(expandedComments);
+                                            if (newExpanded.has(item.id)) {
+                                                newExpanded.delete(item.id);
+                                            } else {
+                                                newExpanded.add(item.id);
+                                            }
+                                            setExpandedComments(newExpanded);
+                                        }}
+                                    >
                                         <Ionicons name="chatbubble-outline" size={18} color="#64748B" />
                                         <Text style={styles.actionText}>{item.commentCount || 0}</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity style={styles.actionButton}>
                                         <Ionicons name="share-outline" size={18} color="#64748B" />
+                                        <Text style={styles.actionText}>Share</Text>
                                     </TouchableOpacity>
                                 </View>
+
+                                {/* Comment Section - Expandable for entrepreneur discussions */}
+                                {expandedComments.has(item.id) && (
+                                    <View style={styles.commentSectionContainer}>
+                                        <View style={styles.commentDivider} />
+                                        <CommentSection
+                                            postId={item.id}
+                                            postAuthorId={item.authorId}
+                                            onCommentCountChange={(count) => {
+                                                setFeedItems(prev => prev.map(p =>
+                                                    p.id === item.id ? { ...p, commentCount: count } : p
+                                                ));
+                                            }}
+                                        />
+                                    </View>
+                                )}
                             </View>
                         ))
                     ) : (
@@ -180,7 +229,7 @@ export default function FeedScreen({ navigation }: any) {
                     )}
                 </View>
 
-                <TouchableOpacity 
+                <TouchableOpacity
                     style={styles.secondaryButton}
                     onPress={() => navigation.navigate('Home')}
                 >
@@ -405,5 +454,13 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '600',
         color: 'white'
+    },
+    commentSectionContainer: {
+        marginTop: 12,
+    },
+    commentDivider: {
+        height: 1,
+        backgroundColor: '#E2E8F0',
+        marginBottom: 12,
     }
 });
