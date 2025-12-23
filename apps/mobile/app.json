@@ -38,12 +38,10 @@
       "expo-font"
     ],
     "extra": {
-      "graphClientId": "PROVIDE_AT_BUILD_TIME",
+      "graphClientId": "${EXPO_PUBLIC_GRAPH_CLIENT_ID}",
       "graphTenantId": "common",
       "graphUseProxy": true,
       "graphScopes": [
-        "Calendars.ReadWrite",
-        "offline_access",
         "Calendars.ReadWrite",
         "offline_access"
       ],
