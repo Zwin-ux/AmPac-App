@@ -1,0 +1,618 @@
+{
+  "collectionId": "51020226-e2a7e55d-0b4d-48df-bfb7-2e0e193b314d",
+  "workspaceId": "2b348d59-1877-4724-8bf0-0c7120387a12",
+  "info": {
+    "name": "AmPac Brain API",
+    "description": "Comprehensive API collection for AmPac Brain service - AI-powered lending platform",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://ampac-brain-381306899120.us-central1.run.app",
+      "type": "string"
+    },
+    {
+      "key": "localUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "apiVersion",
+      "value": "/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "firebaseToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "apiKey",
+      "value": "9dbUrc3VKS8Xr2Ho2Q4tZQ427-LuqT2cJcDMilKqw-Y",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{firebaseToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Health & Status",
+      "item": [
+        {
+          "name": "Root Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": ["{{baseUrl}}"],
+              "path": [""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Basic Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Detailed API Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}{{apiVersion}}/health/",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "health", ""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Dependencies Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}{{apiVersion}}/health/deps",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "health", "deps"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Sync Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}{{apiVersion}}/health/sync",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "health", "sync"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Calendar Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}{{apiVersion}}/health/calendar",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "health", "calendar"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Chat & Messaging",
+      "item": [
+        {
+          "name": "Get Chat Threads",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{firebaseToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiVersion}}/chat/threads",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "chat", "threads"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Chat Thread",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{firebaseToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{apiVersion}}/chat/threads",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "chat", "threads"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Thread Messages",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{firebaseToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiVersion}}/chat/threads/:threadId/messages",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "chat", "threads", ":threadId", "messages"],
+              "variable": [
+                {
+                  "key": "threadId",
+                  "value": "test-thread-id"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Send Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{firebaseToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Hello, I need help with my loan application\",\n  \"senderRole\": \"borrower\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{apiVersion}}/chat/threads/:threadId/messages",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "chat", "threads", ":threadId", "messages"],
+              "variable": [
+                {
+                  "key": "threadId",
+                  "value": "test-thread-id"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Chat Completions (AI)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{firebaseToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a helpful assistant for AmPac Business Capital, helping borrowers with loan applications.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"What documents do I need for an SBA loan application?\"\n    }\n  ],\n  \"context\": {\n    \"screen\": \"ApplicationReview\",\n    \"userRole\": \"borrower\"\n  },\n  \"stream\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{apiVersion}}/chat/completions",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "chat", "completions"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Applications",
+      "item": [
+        {
+          "name": "Applications Ping",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}{{apiVersion}}/applications/ping",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "applications", "ping"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List My Applications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{firebaseToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiVersion}}/applications/user/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "applications", "user", "me"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Application",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{firebaseToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessName\": \"Test Business LLC\",\n  \"loanAmount\": 250000,\n  \"loanPurpose\": \"Equipment purchase and working capital\",\n  \"businessType\": \"LLC\",\n  \"industry\": \"Manufacturing\",\n  \"yearsInBusiness\": 5,\n  \"annualRevenue\": 1200000,\n  \"employeeCount\": 15\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{apiVersion}}/applications/",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "applications", ""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Application",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{firebaseToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiVersion}}/applications/:appId",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "applications", ":appId"],
+              "variable": [
+                {
+                  "key": "appId",
+                  "value": "test-app-id"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Application",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{firebaseToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"loanAmount\": 300000,\n  \"loanPurpose\": \"Equipment purchase, working capital, and facility expansion\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{apiVersion}}/applications/:appId",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "applications", ":appId"],
+              "variable": [
+                {
+                  "key": "appId",
+                  "value": "test-app-id"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Application",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{firebaseToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiVersion}}/applications/:appId/submit",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "applications", ":appId", "submit"],
+              "variable": [
+                {
+                  "key": "appId",
+                  "value": "test-app-id"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Documents",
+      "item": [
+        {
+          "name": "Analyze Document",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{firebaseToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentId\": \"doc_12345\",\n  \"fileName\": \"tax_return_2023.pdf\",\n  \"content\": \"Base64 encoded document content or file path\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{apiVersion}}/documents/analyze",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "documents", "analyze"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Document",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{firebaseToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{apiVersion}}/documents/upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "documents", "upload"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Local Development",
+      "item": [
+        {
+          "name": "Local Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{localUrl}}/health",
+              "host": ["{{localUrl}}"],
+              "path": ["health"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Local Chat Completions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Hello, test message for local development\"\n    }\n  ],\n  \"context\": {\n    \"screen\": \"Development\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{localUrl}}{{apiVersion}}/chat/completions",
+              "host": ["{{localUrl}}"],
+              "path": ["{{apiVersion}}", "chat", "completions"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-generate request ID for tracing",
+          "pm.globals.set('requestId', pm.variables.replaceIn('{{$guid}}'));",
+          "",
+          "// Set common headers",
+          "pm.request.headers.add({",
+          "    key: 'X-Request-ID',",
+          "    value: pm.globals.get('requestId')",
+          "});",
+          "",
+          "pm.request.headers.add({",
+          "    key: 'X-Client-Version',",
+          "    value: 'postman-1.0.0'",
+          "});",
+          "",
+          "// Add API key if available",
+          "const apiKey = pm.collectionVariables.get('apiKey');",
+          "if (apiKey) {",
+          "    pm.request.headers.add({",
+          "        key: 'X-API-Key',",
+          "        value: apiKey",
+          "    });",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Common response validation",
+          "pm.test('Response time is reasonable', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(30000);",
+          "});",
+          "",
+          "pm.test('Response has valid JSON or is expected format', function () {",
+          "    const contentType = pm.response.headers.get('Content-Type');",
+          "    if (contentType && contentType.includes('application/json')) {",
+          "        pm.response.to.have.jsonBody();",
+          "    }",
+          "});",
+          "",
+          "// Log response for debugging",
+          "console.log('Response Status:', pm.response.status);",
+          "console.log('Response Time:', pm.response.responseTime + 'ms');",
+          "",
+          "// Check for error responses",
+          "if (pm.response.code >= 400) {",
+          "    console.log('Error Response:', pm.response.text());",
+          "}"
+        ]
+      }
+    }
+  ],
+  "testResults": {
+    "lastRun": "2025-12-24T19:15:00.000Z",
+    "totalRequests": 9,
+    "failedRequests": 8,
+    "successRate": "11.1%",
+    "status": "EMERGENCY",
+    "serviceStatus": "DOWN",
+    "issues": [
+      {
+        "type": "Service Unavailable",
+        "severity": "Emergency",
+        "description": "Brain API service completely down - all revisions failing to start",
+        "affectedEndpoints": ["ALL"],
+        "rootCause": "Container startup failures, Firebase permission errors, environment variable mismatch",
+        "recommendedFix": "Execute emergency recovery plan in brain-api-emergency-fix.md"
+      }
+    ]
+  },
+  "recommendations": [
+    {
+      "priority": "P0-EMERGENCY",
+      "action": "Execute emergency service restoration",
+      "command": "See brain-api-emergency-fix.md for complete recovery plan"
+    },
+    {
+      "priority": "P0-EMERGENCY", 
+      "action": "Fix Firebase service account permissions",
+      "command": "gcloud projects add-iam-policy-binding ampac-database --member='serviceAccount:381306899120-compute@developer.gserviceaccount.com' --role='roles/datastore.user'"
+    },
+    {
+      "priority": "P0-EMERGENCY",
+      "action": "Deploy with correct environment variables",
+      "implementation": "Use BRAIN_API_KEY instead of API_KEY"
+    }
+  ]
+}
