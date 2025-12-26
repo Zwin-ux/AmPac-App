@@ -1,0 +1,53 @@
+mutation AddNewClient(
+    $address: String!,
+    $companyName: String!,
+    $email: String!,
+    $firstName: String!,
+    $lastName: String!,
+    $phoneNumber: String!
+) @auth(level: USER, insecureReason: "This operation is safe to expose to all logged in users.") {
+  client_insert(data: {
+    address: $address,
+    companyName: $companyName,
+    email: $email,
+    firstName: $firstName,
+    lastName: $lastName,
+    phoneNumber: $phoneNumber
+  })
+}
+
+query ListRooms @auth(level: PUBLIC, insecureReason: "This operation is safe to expose to the public") {
+  rooms {
+    id
+    name
+    capacity
+    description
+  }
+}
+
+mutation CreateNewBooking(
+    $clientId: UUID!,
+    $roomId: UUID!,
+    $bookingDate: Date!,
+    $startTime: Timestamp!,
+    $endTime: Timestamp!,
+    $purpose: String!
+) @auth(level: USER, insecureReason: "This operation is safe to expose to all logged in users.") {
+  booking_insert(data: {
+    clientId: $clientId,
+    roomId: $roomId,
+    bookingDate: $bookingDate,
+    startTime: $startTime,
+    endTime: $endTime,
+    purpose: $purpose
+  })
+}
+
+query GetClientSupportMessages($clientId: UUID!) @auth(level: USER) {
+  supportMessages(where: {clientId: {eq: $clientId}}) {
+    id
+    messageContent
+    sentAt
+    isFromClient
+  }
+}

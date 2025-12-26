@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "381306899120",
+    "project_id": "ampac-database",
+    "storage_bucket": "ampac-database.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:381306899120:android:807686b338ca97c7bdc975",
+        "android_client_info": {
+          "package_name": "com.ampac.borrower"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "381306899120-7gd5hs4lgnv3u4ub0gttr7l5gnalt6sa.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCiW1jZ-Aoc2OdQZragiJDTKzXPLPECkPM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "381306899120-7gd5hs4lgnv3u4ub0gttr7l5gnalt6sa.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

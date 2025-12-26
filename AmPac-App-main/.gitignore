@@ -1,0 +1,20 @@
+# ... existing ignores if any ...
+node_modules/
+.env
+.DS_Store
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Brain Secrets (Override)
+apps/brain/serviceAccountKey.json
+apps/brain/*.json
+!apps/brain/package.json
+!apps/brain/tsconfig.json
+apps/brain/*.pem
+apps/brain/cert.pem
+apps/brain/key.pem
+
+# Data
+apps/brain/data/

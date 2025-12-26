@@ -1,0 +1,90 @@
+{
+  "expo": {
+    "name": "AmPac Capital",
+    "slug": "ampac-business-capital",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "scheme": "ampac",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ampac.borrower",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "This app uses the photo library to let you upload profile pictures and share images in chat.",
+        "NSCameraUsageDescription": "This app uses the camera to let you take profile pictures and share photos in chat.",
+        "NSContactsUsageDescription": "This app accesses your contacts to help you connect with other AmPac users.",
+        "NSCalendarsUsageDescription": "This app accesses your calendar to help schedule meetings and events.",
+        "NSLocationWhenInUseUsageDescription": "This app uses location to help you find nearby AmPac locations and events.",
+        "NSFinancialDataUsageDescription": "This app processes loan applications and financial documents to provide business funding services.",
+        "NSDocumentUsageDescription": "This app accesses documents to process loan applications and verify business information.",
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleAllowMixedLocalizations": true,
+        "LSApplicationQueriesSchemes": ["tel", "mailto", "sms"]
+      },
+      "associatedDomains": ["applinks:ampac.com"],
+      "entitlements": {
+        "com.apple.developer.associated-domains": ["applinks:ampac.com"]
+      }
+    },
+    "android": {
+      "package": "com.ampac.borrower",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_CONTACTS",
+        "READ_CALENDAR",
+        "WRITE_CALENDAR",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-font"
+    ],
+    "extra": {
+      "scheme": "ampac",
+      "eas": {
+        "projectId": "d4d70bfc-70cd-4a73-a5c2-bd56d33b2474"
+      },
+      "firebaseApiKey": "${EXPO_PUBLIC_FIREBASE_API_KEY}",
+      "firebaseAuthDomain": "${EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN}",
+      "firebaseProjectId": "${EXPO_PUBLIC_FIREBASE_PROJECT_ID}",
+      "firebaseStorageBucket": "${EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET}",
+      "firebaseMessagingSenderId": "${EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}",
+      "firebaseAppId": "${EXPO_PUBLIC_FIREBASE_APP_ID}",
+      "firebaseMeasurementId": "${EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID}",
+      "stripePublishableKey": "${EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY}",
+      "brainApiUrl": "${EXPO_PUBLIC_BRAIN_API_URL}",
+      "brainApiKey": "${EXPO_PUBLIC_BRAIN_API_KEY}"
+    },
+    "owner": "ampac",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/d4d70bfc-70cd-4a73-a5c2-bd56d33b2474"
+    }
+  }
+}

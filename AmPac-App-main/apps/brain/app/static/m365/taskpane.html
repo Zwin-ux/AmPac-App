@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AmPac Brain</title>
+    <script src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js" type="text/javascript"></script>
+    <link href="taskpane.css" rel="stylesheet" type="text/css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body class="ms-font-m ms-welcome">
+    <div id="content-main">
+        <div class="header">
+            <img src="../../static/icon-64.png" alt="AmPac Logo" class="logo" />
+            <h1>AmPac Brain</h1>
+        </div>
+
+        <div class="card" id="analysis-section">
+            <h2>SBA Deal Screening</h2>
+            <div id="analysis-content" class="loading-placeholder">
+                Select an email to screen...
+            </div>
+            <button id="analyze-btn" class="primary-btn">Screen Deal</button>
+        </div>
+
+        <div class="card" id="actions-section" style="display:none;">
+            <h2>Next Steps</h2>
+            <div id="deal-score-badge" class="badge"></div>
+            <button id="create-app-btn" class="primary-btn">Create Application</button>
+            <button id="draft-reply-btn" class="secondary-btn">Draft "Missing Docs" Reply</button>
+        </div>
+
+        <div id="message-area"></div>
+    </div>
+    <script src="taskpane.js" type="text/javascript"></script>
+</body>
+
+</html>

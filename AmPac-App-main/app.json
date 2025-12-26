@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "ad5b3ab3-5e20-42c0-b315-0eafb8711df2"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.mazenzwin.ampacappmain",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    }
+  }
+}
