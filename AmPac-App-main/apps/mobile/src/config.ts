@@ -21,7 +21,10 @@ const getBaseUrl = () => {
         return 'http://localhost:8001/api/v1';
     }
 
-    throw new Error('Missing EXPO_PUBLIC_BRAIN_API_URL or EXPO_PUBLIC_API_URL for this build');
+    // Production fallback - use hardcoded URL if env vars not available
+    // This prevents crashes when env vars aren't properly injected during build
+    console.warn('⚠️ Using fallback Brain API URL - env vars may not be configured');
+    return 'https://ampac-brain-381306899120.us-central1.run.app/api/v1';
 };
 
 export const API_URL = getBaseUrl();
