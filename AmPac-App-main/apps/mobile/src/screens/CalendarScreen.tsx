@@ -16,7 +16,8 @@ import {
     TextInput,
     ActivityIndicator,
     FlatList,
-    Alert
+    Alert,
+    Linking
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -405,6 +406,86 @@ const CalendarScreen: React.FC = () => {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
     const [stats, setStats] = useState({ todayCount: 0, weekCount: 0, pendingMilestones: 0, overdueCount: 0 });
+
+    // Handle deep links for event creation
+    useEffect(() => {
+        const handleDeepLink = (url: string) => {
+            try {
+                const parsedUrl = new URL(url);
+                
+                // Handle calendar event creation from links
+                if (parsedUrl.pathname.includes('/calendar/create')) {
+                    const params = parsedUrl.searchParams;
+                    const title = params.get('title');
+                    const description = params.get('description');
+                    const location = params.get('location');
+                    const dateStr = params.get('date');
+                    const timeStr = params.get('time');
+                    
+                    if (title) {
+                        // Parse date and time if provided
+                        let eventDate = new Date();
+                        if (dateStr) {
+                            const parsedDate = new Date(dateStr);
+                            if (!isNaN(parsedDate.getTime())) {
+                                eventDate = parsedDate;
+                            }
+                        }
+                        
+                        if (timeStr) {
+                            const [hours, minutes] = timeStr.split(':').map(Number);
+                            if (!isNaN(hours) && !isNaN(minutes)) {
+                                eventDate.setHours(hours, minutes);
+                            }
+                        }
+                        
+                        // Pre-populate event creation modal
+                        setSelectedDate(eventDate);
+                        setCurrentDate(eventDate);
+                        
+                        // Create event data from URL parameters
+                        const eventData: Partial<CalendarEvent> = {
+                            title,
+                            description: description || undefined,
+                            location: location || undefined,
+                            type: 'personal',
+                            allDay: !timeStr,
+                            startDate: Timestamp.fromDate(eventDate),
+                            endDate: Timestamp.fromDate(eventDate),
+                            recurrence: 'none',
+                            reminders: [60]
+                        };
+                        
+                        // Auto-create the event or show modal for confirmation
+                        if (params.get('auto') === 'true') {
+                            handleCreateEvent(eventData);
+                        } else {
+                            setEditingEvent(eventData as CalendarEvent);
+                            setShowCreateModal(true);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error parsing deep link:', error);
+            }
+        };
+
+        // Listen for deep links
+        const subscription = Linking.addEventListener('url', ({ url }) => {
+            handleDeepLink(url);
+        });
+
+        // Check if app was opened with a deep link
+        Linking.getInitialURL().then(url => {
+            if (url) {
+                handleDeepLink(url);
+            }
+        });
+
+        return () => {
+            subscription?.remove();
+        };
+    }, []);
 
     // Get calendar grid dates for month view
     const getMonthDates = useCallback((date: Date): Date[] => {

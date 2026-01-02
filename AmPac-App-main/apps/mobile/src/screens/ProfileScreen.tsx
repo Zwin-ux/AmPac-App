@@ -41,19 +41,6 @@ export default function ProfileScreen({ navigation }: any) {
                         setNotificationsEnabled(userData.notificationsEnabled);
                     }
                     await cacheService.set(CACHE_KEY_PROFILE, userData);
-                } else if (__DEV__) {
-                    // Mock user for dev mode
-                    const mockUser = {
-                        uid: 'dev-user',
-                        email: 'dev@ampac.com',
-                        fullName: 'AmPac Dev User',
-                        businessName: 'Dev Business Inc.',
-                        role: 'entrepreneur',
-                        createdAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
-                        phone: '555-0123'
-                    } as User;
-                    setUser(mockUser);
-                    await cacheService.set(CACHE_KEY_PROFILE, mockUser);
                 } else {
                     setUser(null);
                 }

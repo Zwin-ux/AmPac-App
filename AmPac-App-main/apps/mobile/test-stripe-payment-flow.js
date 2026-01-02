@@ -43,8 +43,8 @@ class StripePaymentFlowTester {
     this.log('Testing Stripe configuration...', 'test');
     
     try {
-      // Check environment variables
-      const envFiles = ['.env', '.env.production'];
+      // Check environment variables - prioritize production config
+      const envFiles = ['.env.production', '.env'];
       let stripeKeyFound = false;
       let keyType = '';
       
@@ -62,6 +62,8 @@ class StripePaymentFlowTester {
                 keyType = 'test';
               } else if (key.startsWith('pk_live_')) {
                 keyType = 'live';
+              } else {
+                keyType = 'unknown';
               }
             }
             break;

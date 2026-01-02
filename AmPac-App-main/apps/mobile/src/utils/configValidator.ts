@@ -1,6 +1,7 @@
 /**
  * Configuration Validator
  * Validates that all required environment variables are loaded correctly
+ * Brain API removed for v1 launch - Firebase only
  */
 
 export interface ConfigValidationResult {
@@ -9,8 +10,6 @@ export interface ConfigValidationResult {
     warnings: string[];
     config: {
         appEnv: string;
-        brainApiUrl: string;
-        brainApiKey: string;
         firebaseConfig: {
             apiKey: string;
             authDomain: string;
@@ -31,8 +30,6 @@ export const validateConfiguration = (): ConfigValidationResult => {
 
     // Get environment variables
     const appEnv = process.env.APP_ENV || 'unknown';
-    const brainApiUrl = process.env.EXPO_PUBLIC_BRAIN_API_URL || '';
-    const brainApiKey = process.env.EXPO_PUBLIC_BRAIN_API_KEY || '';
     
     const firebaseConfig = {
         apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || '',
@@ -47,19 +44,6 @@ export const validateConfiguration = (): ConfigValidationResult => {
     const stripePublishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || '';
     const sentryDsn = process.env.EXPO_PUBLIC_SENTRY_DSN || '';
 
-    // Validate required environment variables
-    if (!brainApiUrl) {
-        errors.push('EXPO_PUBLIC_BRAIN_API_URL is missing');
-    } else if (!brainApiUrl.startsWith('https://')) {
-        errors.push('EXPO_PUBLIC_BRAIN_API_URL must use HTTPS');
-    }
-
-    if (!brainApiKey) {
-        errors.push('EXPO_PUBLIC_BRAIN_API_KEY is missing - AI Brain API will not work');
-    } else if (brainApiKey.length < 20) {
-        warnings.push('EXPO_PUBLIC_BRAIN_API_KEY seems too short');
-    }
-
     // Validate Firebase configuration
     const requiredFirebaseFields = [
         'apiKey', 'authDomain', 'projectId', 'storageBucket', 
@@ -67,8 +51,11 @@ export const validateConfiguration = (): ConfigValidationResult => {
     ];
     
     for (const field of requiredFirebaseFields) {
-        if (!firebaseConfig[field as keyof typeof firebaseConfig]) {
-            errors.push(`Firebase ${field} is missing`);
+        const value = firebaseConfig[field as keyof typeof firebaseConfig];
+        if (!value) {
+            warnings.push(`Firebase ${field} is missing (will use fallback)`);
+        } else if (value.startsWith('${')) {
+            warnings.push(`Firebase ${field} has unsubstituted template variable (will use fallback)`);
         }
     }
 
@@ -78,7 +65,9 @@ export const validateConfiguration = (): ConfigValidationResult => {
 
     // Validate Stripe configuration
     if (!stripePublishableKey) {
-        warnings.push('EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY is missing - payments will not work');
+        warnings.push('EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY is missing (will use fallback)');
+    } else if (stripePublishableKey.startsWith('${')) {
+        warnings.push('Stripe key has unsubstituted template variable (will use fallback)');
     } else if (!stripePublishableKey.startsWith('pk_')) {
         errors.push('EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY has invalid format');
     }
@@ -86,6 +75,8 @@ export const validateConfiguration = (): ConfigValidationResult => {
     // Validate Sentry configuration
     if (!sentryDsn) {
         warnings.push('EXPO_PUBLIC_SENTRY_DSN is missing - error tracking will not work');
+    } else if (sentryDsn.startsWith('${')) {
+        warnings.push('Sentry DSN has unsubstituted template variable');
     } else if (!sentryDsn.startsWith('https://')) {
         errors.push('EXPO_PUBLIC_SENTRY_DSN has invalid format');
     }
@@ -95,10 +86,6 @@ export const validateConfiguration = (): ConfigValidationResult => {
         if (stripePublishableKey.includes('test')) {
             warnings.push('Using test Stripe key in production environment');
         }
-        
-        if (brainApiUrl.includes('localhost') || brainApiUrl.includes('127.0.0.1')) {
-            errors.push('Using localhost Brain API URL in production');
-        }
     }
 
     return {
@@ -107,11 +94,9 @@ export const validateConfiguration = (): ConfigValidationResult => {
         warnings,
         config: {
             appEnv,
-            brainApiUrl,
-            brainApiKey: brainApiKey ? `${brainApiKey.substring(0, 8)}...` : '', // Masked for security
             firebaseConfig,
-            stripePublishableKey,
-            sentryDsn,
+            stripePublishableKey: stripePublishableKey ? 'Set' : 'Missing',
+            sentryDsn: sentryDsn ? 'Set' : 'Missing',
         }
     };
 };
@@ -121,11 +106,9 @@ export const logConfigurationStatus = (): void => {
     
     console.log('🔧 Configuration Validation Results:');
     console.log(`Environment: ${validation.config.appEnv}`);
-    console.log(`Brain API URL: ${validation.config.brainApiUrl}`);
-    console.log(`Brain API Key: ${validation.config.brainApiKey ? 'Set ✅' : 'Missing ❌'}`);
-    console.log(`Firebase Project: ${validation.config.firebaseConfig.projectId}`);
-    console.log(`Stripe Key: ${validation.config.stripePublishableKey ? 'Set ✅' : 'Missing ❌'}`);
-    console.log(`Sentry DSN: ${validation.config.sentryDsn ? 'Set ✅' : 'Missing ❌'}`);
+    console.log(`Firebase Project: ${validation.config.firebaseConfig.projectId || '(using fallback)'}`);
+    console.log(`Stripe Key: ${validation.config.stripePublishableKey}`);
+    console.log(`Sentry DSN: ${validation.config.sentryDsn}`);
     
     if (validation.errors.length > 0) {
         console.error('❌ Configuration Errors:');

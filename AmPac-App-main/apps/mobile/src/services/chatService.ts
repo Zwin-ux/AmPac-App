@@ -15,10 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '../../firebaseConfig';
 import { Channel, Message } from '../types';
-import { API_URL } from '../config';
-import { getFirebaseIdToken } from './brainAuth';
 import { getCurrentUserId, getCurrentDisplayName } from './authUtils';
-import { getApiHeaders } from './assistantService';
 
 export const chatService = {
     /**
@@ -71,31 +68,7 @@ export const chatService = {
         mediaUrl?: string
     ): Promise<string> => {
         try {
-            let uid = getCurrentUserId();
-
-            // If no authenticated user in dev mode, attempt anonymous sign-in so chat can use a real auth context
-            if (!auth.currentUser && __DEV__) {
-                try {
-                    const { signInAnonymously } = await import('firebase/auth');
-                    const cred = await signInAnonymously(auth);
-                    // Create lightweight user doc for dev use
-                    const anonUid = cred.user?.uid;
-                    if (anonUid) {
-                        const { setDoc, doc: firestoreDoc } = await import('firebase/firestore');
-                        await setDoc(firestoreDoc(db, 'users', anonUid), {
-                            uid: anonUid,
-                            role: 'entrepreneur',
-                            fullName: 'AmPac Dev User',
-                            businessName: 'Dev Business Inc.',
-                            createdAt: serverTimestamp()
-                        }, { merge: true });
-                        uid = anonUid;
-                    }
-                } catch (e) {
-                    console.warn('Anonymous sign-in for chat failed:', e);
-                }
-            }
-
+            const uid = getCurrentUserId();
             if (!uid) throw new Error("User not authenticated");
 
             const user = auth.currentUser;
@@ -214,57 +187,28 @@ export const chatService = {
 
     /**
      * Get all chat threads for the current user (Borrower <-> Staff).
+     * Brain API removed for v1 - returns empty array
      */
     getThreads: async () => {
-        try {
-            const headers = await getApiHeaders();
-            const res = await fetch(`${API_URL}/chat/threads`, {
-                headers
-            });
-            if (!res.ok) throw new Error('Failed to fetch threads');
-            return await res.json();
-        } catch (error) {
-            console.error("Error fetching threads:", error);
-            return [];
-        }
+        console.log('[Chat] Staff threads feature coming soon');
+        return [];
     },
 
     /**
      * Get messages for a specific thread.
+     * Brain API removed for v1 - returns empty array
      */
-    getThreadMessages: async (threadId: string) => {
-        try {
-            const headers = await getApiHeaders();
-            const res = await fetch(`${API_URL}/chat/threads/${threadId}/messages`, {
-                headers
-            });
-            if (!res.ok) throw new Error('Failed to fetch messages');
-            return await res.json();
-        } catch (error) {
-            console.error("Error fetching thread messages:", error);
-            return [];
-        }
+    getThreadMessages: async (_threadId: string) => {
+        console.log('[Chat] Staff thread messages feature coming soon');
+        return [];
     },
 
     /**
      * Send a message to a staff thread.
+     * Brain API removed for v1 - throws error
      */
-    sendThreadMessage: async (threadId: string, text: string) => {
-        try {
-            const headers = await getApiHeaders();
-            const res = await fetch(`${API_URL}/chat/threads/${threadId}/messages`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({ text })
-            });
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.detail || 'Failed to send message');
-            }
-            return await res.json();
-        } catch (error) {
-            console.error("Error sending thread message:", error);
-            throw error;
-        }
+    sendThreadMessage: async (_threadId: string, _text: string) => {
+        console.log('[Chat] Staff messaging feature coming soon');
+        throw new Error('Staff messaging will be available in a future update');
     }
 };

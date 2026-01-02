@@ -57,8 +57,6 @@ export const commentService = {
                 const userSnap = await getDoc(doc(db, 'users', user.uid));
                 const userData = userSnap.exists() ? userSnap.data() : {};
                 badges = userData.badges || [];
-            } else if (uid === 'dev-user') {
-                badges = ['Developer'];
             }
 
             const newComment: any = {

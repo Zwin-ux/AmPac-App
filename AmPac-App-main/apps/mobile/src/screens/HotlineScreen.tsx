@@ -5,8 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../theme';
 import { createHotlineRequest } from '../services/firestore';
 import { auth } from '../../firebaseConfig';
-import AssistantBubble from '../components/AssistantBubble';
-import { notifySupportChannel } from '../services/notifications';
+
+import { notifySupportChannel, sendSupportEmail, getSupportEmail } from '../services/notifications';
 import { Ionicons } from '@expo/vector-icons';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -181,6 +181,7 @@ export default function HotlineScreen() {
                 return;
             }
             const uid = auth.currentUser.uid;
+            const userEmail = auth.currentUser.email || 'Unknown';
 
             const stored = await createHotlineRequest(
                 uid,
@@ -190,7 +191,15 @@ export default function HotlineScreen() {
 
             const notified = await notifySupportChannel({
                 title: 'New Support Hotline Request',
-                body: `Subject: ${subject}\nMessage: ${message}\nUser: ${uid}`,
+                body: `Subject: ${subject}\nMessage: ${message}\nUser: ${uid}\nEmail: ${userEmail}`,
+                userEmail,
+            });
+
+            // Also send email to support team
+            await sendSupportEmail({
+                title: `Support Request: ${subject}`,
+                body: `From: ${userEmail}\n\n${message}`,
+                userEmail,
             });
 
             if (!stored) {
@@ -201,7 +210,7 @@ export default function HotlineScreen() {
                 return;
             }
 
-            Alert.alert('Success', 'Your request has been sent to AmPac support.');
+            Alert.alert('Success', `Your request has been sent to AmPac support at ${getSupportEmail()}.`);
             setSubject('');
             setMessage('');
             navigation.goBack();
@@ -415,7 +424,7 @@ export default function HotlineScreen() {
                     </View>
                 </View>
             </Modal>
-            <AssistantBubble context="support" />
+
         </SafeAreaView>
     );
 }

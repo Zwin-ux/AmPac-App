@@ -56,34 +56,8 @@ export default function SignUpScreen() {
     };
 
     const handleDemo = async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const { Timestamp } = await import('firebase/firestore');
-
-            const demoProfile = {
-                uid: 'demo-user-123',
-                role: 'entrepreneur',
-                fullName: 'Alex Rivera',
-                businessName: 'Rivera Innovations',
-                phone: '909-555-0101',
-                industry: 'Technology',
-                city: 'Riverside',
-                bio: 'Building the future of sustainable tech in the Inland Empire.',
-                jobTitle: 'Founder & CEO',
-                createdAt: Timestamp.now(),
-            };
-
-            userStore.setDemoUser(demoProfile as any);
-        } catch (err: any) {
-            console.error('Demo Error:', err);
-            setError({
-                ...getErrorMessage('genericFallback'),
-                detail: err?.message || getErrorMessage('genericFallback').detail,
-            });
-        } finally {
-            setLoading(false);
-        }
+        // Navigate to sign in for demo mode
+        navigation.navigate('SignIn');
     };
 
     return (

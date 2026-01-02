@@ -1,6 +1,6 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '../utils/asyncStorageOptimization';
 import { Timestamp } from 'firebase/firestore';
-import { getAuth, signInAnonymously } from 'firebase/auth';
+import { getAuth } from 'firebase/auth';
 import { User } from '../types';
 import { getCurrentUserDoc } from './firestore';
 import { app } from '../../firebaseConfig';
@@ -38,14 +38,6 @@ class UserStore {
         await this.persistToStorage(user);
     }
 
-    // DEMO: Manually set user for demo mode (bypasses Firebase Auth)
-    setDemoUser(user: User) {
-        this.user = user;
-        this.isHydrated = true;
-        this.notify();
-        this.persistToStorage(user);
-    }
-
     private notify() {
         this.subscribers.forEach(cb => cb(this.user));
     }
@@ -67,48 +59,12 @@ class UserStore {
         return null;
     }
 
-    // ASYNC: Sync with server (slow, background)
+    // ASYNC: Sync with server
     async syncWithServer(): Promise<User | null> {
         try {
             const auth = getAuth(app);
             const uid = auth.currentUser?.uid;
             if (!uid) {
-                // Dev mode: attempt anonymous sign-in so Firestore rules see a real auth user
-                if (__DEV__) {
-                    try {
-                        const authInst = getAuth(app);
-                        const signInResult = await signInAnonymously(authInst);
-                        const anonUid = authInst.currentUser?.uid;
-                        if (anonUid) {
-                            // Create a lightweight dev user doc to satisfy rules that check users collection
-                            const { setDoc, doc } = await import('firebase/firestore');
-                            const { db } = await import('../../firebaseConfig');
-                            const devDoc = doc(db, 'users', anonUid);
-                            await setDoc(devDoc, {
-                                uid: anonUid,
-                                role: 'entrepreneur',
-                                fullName: 'AmPac Dev User',
-                                businessName: 'Dev Business Inc.',
-                                createdAt: Timestamp.now(),
-                            }, { merge: true });
-
-                            const devUser: User = {
-                                uid: anonUid,
-                                role: 'entrepreneur',
-                                fullName: 'AmPac Dev User',
-                                businessName: 'Dev Business Inc.',
-                                phone: '555-0123',
-                                createdAt: Timestamp.now(),
-                            };
-                            this.user = devUser;
-                            await this.persistToStorage(devUser);
-                            this.notify();
-                            return devUser;
-                        }
-                    } catch (e) {
-                        console.warn('Anonymous sign-in failed:', e);
-                    }
-                }
                 return null;
             }
 
@@ -118,28 +74,6 @@ class UserStore {
                 await this.persistToStorage(serverUser);
                 this.notify();
                 return serverUser;
-            } else {
-                // Check if this is the demo user and create a profile if missing
-                if (auth.currentUser?.email === 'demo@ampac.com') {
-                    const { createUserDoc } = await import('./firestore');
-                    const demoProfile: User = {
-                        uid: uid,
-                        role: 'entrepreneur',
-                        fullName: 'Alex Rivera',
-                        businessName: 'Rivera Innovations',
-                        phone: '909-555-0101',
-                        industry: 'Technology',
-                        city: 'Riverside',
-                        bio: 'Building the future of sustainable tech in the Inland Empire.',
-                        jobTitle: 'Founder & CEO',
-                        createdAt: Timestamp.now(),
-                    };
-                    await createUserDoc(demoProfile);
-                    this.user = demoProfile;
-                    await this.persistToStorage(demoProfile);
-                    this.notify();
-                    return demoProfile;
-                }
             }
         } catch (error) {
             console.error('Error syncing user with server:', error);

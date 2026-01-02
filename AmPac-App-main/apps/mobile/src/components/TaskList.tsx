@@ -5,8 +5,9 @@ import * as DocumentPicker from 'expo-document-picker';
 import { Task } from '../types';
 import { theme } from '../theme';
 import { Card } from './ui/Card';
-import { API_URL } from '../config';
-import { getFirebaseIdToken } from '../services/brainAuth';
+// Brain API removed for v1 launch - document upload disabled
+// import { API_URL } from '../config';
+import { auth } from '../../firebaseConfig';
 
 interface TaskListProps {
   tasks: Task[];
@@ -17,50 +18,12 @@ export const TaskList: React.FC<TaskListProps> = ({ tasks, onRefresh }) => {
   const [uploadingTaskId, setUploadingTaskId] = useState<string | null>(null);
 
   const handleUpload = async (task: Task) => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: '*/*', // Allow all types, or restrict to pdf/images
-        copyToCacheDirectory: true,
-      });
-
-      if (result.canceled) return;
-
-      const asset = result.assets[0];
-      setUploadingTaskId(task.id);
-
-      // Create form data
-      const formData = new FormData();
-      formData.append('taskId', task.id);
-      formData.append('file', {
-        uri: asset.uri,
-        name: asset.name,
-        type: asset.mimeType || 'application/octet-stream',
-      } as any);
-
-      // Upload to Brain
-      const token = await getFirebaseIdToken();
-      const response = await fetch(`${API_URL}/documents/upload`, {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
-
-      Alert.alert('Success', 'Document uploaded successfully!');
-      if (onRefresh) onRefresh();
-
-    } catch (error) {
-      console.error(error);
-      Alert.alert('Error', 'Failed to upload document. Please try again.');
-    } finally {
-      setUploadingTaskId(null);
-    }
+    // Brain API document upload disabled for v1 launch
+    // Documents will be uploaded via Firebase Storage directly in future version
+    Alert.alert(
+      'Coming Soon', 
+      'Document upload will be available in the next update. Please contact support if you need to submit documents urgently.'
+    );
   };
 
   const openTasks = tasks.filter(t => t.status === 'open' || t.status === 'in_progress');

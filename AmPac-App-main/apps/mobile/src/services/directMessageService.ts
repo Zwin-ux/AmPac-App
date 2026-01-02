@@ -12,7 +12,8 @@ import {
     Timestamp,
     writeBatch,
     limit,
-    serverTimestamp
+    serverTimestamp,
+    setDoc
 } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
@@ -492,6 +493,414 @@ export const directMessageService = {
     clearQueue: async (): Promise<void> => {
         directMessageService._messageQueue = [];
         await directMessageService._saveQueueToStorage();
+    },
+
+    /**
+     * Create a private chat room with enhanced privacy features
+     */
+    createPrivateChat: async (participantIds: string[], chatName?: string, isEncrypted: boolean = false): Promise<string> => {
+        try {
+            const currentUser = auth.currentUser;
+            if (!currentUser) throw new Error('Not authenticated');
+
+            // Ensure current user is included
+            const allParticipants = Array.from(new Set([currentUser.uid, ...participantIds]));
+            
+            if (allParticipants.length < 2) {
+                throw new Error('Private chat requires at least 2 participants');
+            }
+
+            const chatId = `private_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            
+            const chatData: any = {
+                id: chatId,
+                type: 'private',
+                participants: allParticipants,
+                participantNames: [] as string[],
+                participantAvatars: [] as string[],
+                name: chatName || `Private Chat`,
+                isEncrypted,
+                createdBy: currentUser.uid,
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now(),
+                lastMessage: null,
+                unreadCount: Object.fromEntries(allParticipants.map(id => [id, 0])),
+                settings: {
+                    allowInvites: false,
+                    messageRetention: 30, // days
+                    readReceipts: true,
+                    typingIndicators: true
+                }
+            };
+
+            // Populate participant names and avatars
+            for (const participantId of allParticipants) {
+                if (participantId === currentUser.uid) {
+                    chatData.participantNames.push(currentUser.displayName || 'User');
+                    chatData.participantAvatars.push(currentUser.photoURL || '');
+                } else {
+                    const userDoc = await getDoc(doc(db, 'users', participantId));
+                    if (userDoc.exists()) {
+                        const userData = userDoc.data();
+                        chatData.participantNames.push(userData.fullName || userData.displayName || 'User');
+                        chatData.participantAvatars.push(userData.photoURL || '');
+                    } else {
+                        chatData.participantNames.push('Unknown User');
+                        chatData.participantAvatars.push('');
+                    }
+                }
+            }
+
+            await setDoc(doc(db, 'private_chats', chatId), chatData);
+            return chatId;
+        } catch (error) {
+            console.error('Error creating private chat:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Send message to private chat with enhanced privacy
+     */
+    sendPrivateMessage: async (chatId: string, content: string, type: 'text' | 'image' | 'document' = 'text', mediaUrl?: string, isEphemeral: boolean = false): Promise<string> => {
+        try {
+            const currentUser = auth.currentUser;
+            if (!currentUser) throw new Error('Not authenticated');
+
+            const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const timestamp = Date.now();
+
+            // Check if user is participant in the chat
+            const chatRef = doc(db, 'private_chats', chatId);
+            const chatDoc = await getDoc(chatRef);
+            
+            if (!chatDoc.exists()) {
+                throw new Error('Private chat not found');
+            }
+
+            const chatData = chatDoc.data();
+            if (!chatData.participants.includes(currentUser.uid)) {
+                throw new Error('Not authorized to send messages to this chat');
+            }
+
+            const messageData = {
+                id: messageId,
+                chatId,
+                senderId: currentUser.uid,
+                senderName: currentUser.displayName || 'User',
+                senderAvatar: currentUser.photoURL || undefined,
+                content: isEphemeral ? '[Ephemeral Message]' : content,
+                originalContent: content, // Store original for ephemeral cleanup
+                type,
+                mediaUrl,
+                isEphemeral,
+                expiresAt: isEphemeral ? Timestamp.fromMillis(timestamp + 24 * 60 * 60 * 1000) : null, // 24 hours
+                read: false,
+                readBy: [currentUser.uid], // Sender has read it
+                createdAt: Timestamp.fromMillis(timestamp),
+                reactions: {},
+                isEdited: false,
+                editHistory: []
+            };
+
+            // If offline, queue the message
+            if (!directMessageService._isOnline) {
+                const queuedMessage: QueuedMessage = {
+                    localId: messageId,
+                    conversationId: chatId,
+                    recipientId: '', // Will be handled differently for private chats
+                    content,
+                    type,
+                    mediaUrl,
+                    timestamp,
+                    retryCount: 0
+                };
+
+                directMessageService._messageQueue.push(queuedMessage);
+                await directMessageService._saveQueueToStorage();
+                return messageId;
+            }
+
+            const batch = writeBatch(db);
+
+            // Add message
+            const messageRef = doc(db, 'private_messages', messageId);
+            batch.set(messageRef, messageData);
+
+            // Update chat last message and unread counts
+            const otherParticipants = chatData.participants.filter((id: string) => id !== currentUser.uid);
+            const unreadUpdates: Record<string, number> = {};
+            
+            for (const participantId of otherParticipants) {
+                const currentUnread = chatData.unreadCount[participantId] || 0;
+                unreadUpdates[`unreadCount.${participantId}`] = currentUnread + 1;
+            }
+
+            batch.update(chatRef, {
+                lastMessage: {
+                    content: isEphemeral ? '[Ephemeral Message]' : content,
+                    senderId: currentUser.uid,
+                    createdAt: Timestamp.fromMillis(timestamp),
+                    type
+                },
+                ...unreadUpdates,
+                updatedAt: serverTimestamp()
+            });
+
+            await batch.commit();
+            return messageId;
+        } catch (error) {
+            console.error('Error sending private message:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Get private chat messages with enhanced features
+     */
+    getPrivateMessages: (chatId: string, callback: (messages: any[]) => void) => {
+        const currentUser = auth.currentUser;
+        if (!currentUser) return () => {};
+
+        const q = query(
+            collection(db, 'private_messages'),
+            where('chatId', '==', chatId),
+            orderBy('createdAt', 'desc'),
+            limit(50)
+        );
+
+        return onSnapshot(q, (snapshot) => {
+            const messages = snapshot.docs.map(doc => {
+                const data = doc.data();
+                
+                // Filter out expired ephemeral messages
+                if (data.isEphemeral && data.expiresAt && data.expiresAt.toMillis() < Date.now()) {
+                    return null;
+                }
+                
+                return {
+                    id: doc.id,
+                    ...data
+                };
+            }).filter(Boolean);
+            
+            callback(messages.reverse()); // Show oldest first
+        });
+    },
+
+    /**
+     * Add reaction to private message
+     */
+    addReaction: async (messageId: string, emoji: string): Promise<void> => {
+        try {
+            const currentUser = auth.currentUser;
+            if (!currentUser) throw new Error('Not authenticated');
+
+            const messageRef = doc(db, 'private_messages', messageId);
+            const messageDoc = await getDoc(messageRef);
+            
+            if (!messageDoc.exists()) {
+                throw new Error('Message not found');
+            }
+
+            const messageData = messageDoc.data();
+            const reactions = messageData.reactions || {};
+            
+            if (!reactions[emoji]) {
+                reactions[emoji] = [];
+            }
+            
+            // Toggle reaction
+            if (reactions[emoji].includes(currentUser.uid)) {
+                reactions[emoji] = reactions[emoji].filter((uid: string) => uid !== currentUser.uid);
+                if (reactions[emoji].length === 0) {
+                    delete reactions[emoji];
+                }
+            } else {
+                reactions[emoji].push(currentUser.uid);
+            }
+
+            await updateDoc(messageRef, { reactions });
+        } catch (error) {
+            console.error('Error adding reaction:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Edit private message
+     */
+    editMessage: async (messageId: string, newContent: string): Promise<void> => {
+        try {
+            const currentUser = auth.currentUser;
+            if (!currentUser) throw new Error('Not authenticated');
+
+            const messageRef = doc(db, 'private_messages', messageId);
+            const messageDoc = await getDoc(messageRef);
+            
+            if (!messageDoc.exists()) {
+                throw new Error('Message not found');
+            }
+
+            const messageData = messageDoc.data();
+            
+            // Only sender can edit their message
+            if (messageData.senderId !== currentUser.uid) {
+                throw new Error('Not authorized to edit this message');
+            }
+
+            // Can't edit ephemeral messages
+            if (messageData.isEphemeral) {
+                throw new Error('Cannot edit ephemeral messages');
+            }
+
+            const editHistory = messageData.editHistory || [];
+            editHistory.push({
+                content: messageData.content,
+                editedAt: Timestamp.now()
+            });
+
+            await updateDoc(messageRef, {
+                content: newContent,
+                isEdited: true,
+                editHistory,
+                lastEditedAt: serverTimestamp()
+            });
+        } catch (error) {
+            console.error('Error editing message:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Delete private message
+     */
+    deletePrivateMessage: async (messageId: string, deleteForEveryone: boolean = false): Promise<void> => {
+        try {
+            const currentUser = auth.currentUser;
+            if (!currentUser) throw new Error('Not authenticated');
+
+            const messageRef = doc(db, 'private_messages', messageId);
+            const messageDoc = await getDoc(messageRef);
+            
+            if (!messageDoc.exists()) {
+                throw new Error('Message not found');
+            }
+
+            const messageData = messageDoc.data();
+            
+            if (deleteForEveryone) {
+                // Only sender can delete for everyone within 1 hour
+                if (messageData.senderId !== currentUser.uid) {
+                    throw new Error('Not authorized to delete this message for everyone');
+                }
+                
+                const messageAge = Date.now() - messageData.createdAt.toMillis();
+                if (messageAge > 60 * 60 * 1000) { // 1 hour
+                    throw new Error('Cannot delete message for everyone after 1 hour');
+                }
+                
+                // Delete the message document
+                const { deleteDoc: deleteDocFn } = await import('firebase/firestore');
+                await deleteDocFn(messageRef);
+            } else {
+                // Delete for current user only
+                const deletedFor = messageData.deletedFor || [];
+                if (!deletedFor.includes(currentUser.uid)) {
+                    deletedFor.push(currentUser.uid);
+                    await updateDoc(messageRef, { deletedFor });
+                }
+            }
+        } catch (error) {
+            console.error('Error deleting private message:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Get user's private chats
+     */
+    getPrivateChats: (callback: (chats: any[]) => void) => {
+        const currentUser = auth.currentUser;
+        if (!currentUser) return () => {};
+
+        const q = query(
+            collection(db, 'private_chats'),
+            where('participants', 'array-contains', currentUser.uid),
+            orderBy('updatedAt', 'desc')
+        );
+
+        return onSnapshot(q, (snapshot) => {
+            const chats = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            
+            callback(chats);
+        });
+    },
+
+    /**
+     * Leave private chat
+     */
+    leavePrivateChat: async (chatId: string): Promise<void> => {
+        try {
+            const currentUser = auth.currentUser;
+            if (!currentUser) throw new Error('Not authenticated');
+
+            const chatRef = doc(db, 'private_chats', chatId);
+            const chatDoc = await getDoc(chatRef);
+            
+            if (!chatDoc.exists()) {
+                throw new Error('Private chat not found');
+            }
+
+            const chatData = chatDoc.data();
+            const updatedParticipants = chatData.participants.filter((id: string) => id !== currentUser.uid);
+            
+            if (updatedParticipants.length === 0) {
+                // Delete chat if no participants left
+                const { deleteDoc: deleteDocFn } = await import('firebase/firestore');
+                await deleteDocFn(chatRef);
+            } else {
+                // Remove user from participants
+                await updateDoc(chatRef, {
+                    participants: updatedParticipants,
+                    updatedAt: serverTimestamp()
+                });
+            }
+        } catch (error) {
+            console.error('Error leaving private chat:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Clean up expired ephemeral messages
+     */
+    cleanupEphemeralMessages: async (): Promise<void> => {
+        try {
+            const now = Timestamp.now();
+            const expiredQuery = query(
+                collection(db, 'private_messages'),
+                where('isEphemeral', '==', true),
+                where('expiresAt', '<=', now)
+            );
+
+            const expiredMessages = await getDocs(expiredQuery);
+            const batch = writeBatch(db);
+
+            expiredMessages.docs.forEach(doc => {
+                batch.delete(doc.ref);
+            });
+
+            if (expiredMessages.docs.length > 0) {
+                await batch.commit();
+                console.log(`Cleaned up ${expiredMessages.docs.length} expired ephemeral messages`);
+            }
+        } catch (error) {
+            console.error('Error cleaning up ephemeral messages:', error);
+        }
     },
 
     /**

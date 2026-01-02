@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { leadsService } from '../services/leadsService';
 import type { PreliminaryLead } from '../types';
 import { useNavigate } from 'react-router-dom';
@@ -16,16 +16,21 @@ export default function PreliminaryLeadsPage() {
     const { accounts } = useMsal();
     const currentUser = accounts[0];
 
-    useEffect(() => {
-        loadLeads();
+    const loadLeads = useCallback(async () => {
+        setLoading(true);
+        try {
+            const data = await leadsService.listPreliminaryLeads();
+            setLeads(data);
+        } catch (error) {
+            console.error("Failed to load leads:", error);
+        } finally {
+            setLoading(false);
+        }
     }, []);
 
-    const loadLeads = async () => {
-        setLoading(true);
-        const data = await leadsService.listPreliminaryLeads();
-        setLeads(data);
-        setLoading(false);
-    };
+    useEffect(() => {
+        loadLeads();
+    }, [loadLeads]);
 
     const handleConvert = async (lead: PreliminaryLead) => {
         if (!confirm(`Convert ${lead.fullName}'s inquiry to a formal application draft?`)) return;
@@ -35,6 +40,7 @@ export default function PreliminaryLeadsPage() {
             alert("Success! Re-routing to the new application...");
             navigate(`/applications/${appId}`);
         } catch (error) {
+            console.error(error);
             alert("Failed to convert lead.");
         }
     };
@@ -44,6 +50,7 @@ export default function PreliminaryLeadsPage() {
             await leadsService.updateLeadStatus(id, status);
             loadLeads();
         } catch (error) {
+            console.error(error);
             alert("Failed to update status.");
         }
     };
@@ -53,6 +60,7 @@ export default function PreliminaryLeadsPage() {
             await leadsService.assignLead(id, staffId);
             loadLeads();
         } catch (error) {
+            console.error(error);
             alert("Failed to assign lead.");
         }
     };
@@ -66,6 +74,7 @@ export default function PreliminaryLeadsPage() {
             setNoteText(prev => ({ ...prev, [id]: '' }));
             loadLeads();
         } catch (error) {
+            console.error(error);
             alert("Failed to add note.");
         }
     };
@@ -105,6 +114,8 @@ export default function PreliminaryLeadsPage() {
                             value={filterStatus}
                             onChange={(e) => setFilterStatus(e.target.value)}
                             className="text-sm bg-transparent border-none focus:ring-0 text-textPrimary outline-none"
+                            aria-label="Filter status"
+                            title="Filter status"
                         >
                             <option value="all">All Statuses</option>
                             <option value="new">New Interests</option>
@@ -116,6 +127,8 @@ export default function PreliminaryLeadsPage() {
                     <button
                         onClick={loadLeads}
                         className="p-2 text-textSecondary hover:text-primary transition-colors bg-white border border-border rounded-md"
+                        aria-label="Refresh leads"
+                        title="Refresh leads"
                     >
                         <Clock className="w-5 h-5" />
                     </button>
@@ -167,6 +180,8 @@ export default function PreliminaryLeadsPage() {
                                                 value={lead.assignedTo || ''}
                                                 onChange={(e) => handleAssign(lead.id, e.target.value)}
                                                 className="text-[11px] bg-transparent border-none p-0 text-textPrimary focus:ring-0 outline-none font-bold"
+                                                aria-label="Assign info"
+                                                title="Assign Info"
                                             >
                                                 <option value="">Unassigned</option>
                                                 {staffMembers.map(s => (
@@ -187,6 +202,8 @@ export default function PreliminaryLeadsPage() {
                                         <button
                                             onClick={() => setExpandedLead(expandedLead === lead.id ? null : lead.id)}
                                             className="p-2 text-textSecondary hover:bg-surfaceHighlight rounded-full transition-colors"
+                                            aria-label={expandedLead === lead.id ? "Collapse" : "Expand"}
+                                            title={expandedLead === lead.id ? "Collapse" : "Expand"}
                                         >
                                             {expandedLead === lead.id ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                                         </button>

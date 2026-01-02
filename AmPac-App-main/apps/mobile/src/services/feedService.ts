@@ -55,8 +55,6 @@ export const feedService = {
                 const userSnap = await getDoc(doc(db, 'users', user.uid));
                 const userData = userSnap.exists() ? userSnap.data() : {};
                 badges = userData.badges || [];
-            } else if (uid === 'dev-user') {
-                badges = ['Developer'];
             }
 
             // Extract hashtags from content
@@ -124,7 +122,7 @@ export const feedService = {
         return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FeedPost));
     },
 
-    computeEngagementScore: (item: FeedPost | Event): number => {
+    computeEngagementScore: (item: FeedPost | Event, userPreferences?: { interests?: string[], followedUsers?: string[] }): number => {
         const likes = (item as FeedPost).likes?.length || 0;
         const comments = (item as FeedPost).commentCount || 0;
         const featuredBoost = (item as FeedPost).featured ? 100 : 0;
@@ -134,15 +132,51 @@ export const feedService = {
         const createdAt = item.createdAt instanceof Timestamp ? item.createdAt.toDate() : new Date();
         const hoursOld = (Date.now() - createdAt.getTime()) / 3600000;
 
-        const baseScore = (likes + comments * 2 + 1) / Math.pow(hoursOld + 2, 1.5);
-        return baseScore + featuredBoost + pinnedBoost;
+        // Base engagement score with improved weighting
+        const baseScore = (likes * 1.5 + comments * 3 + 1) / Math.pow(hoursOld + 2, 1.2);
+        
+        // Personalization factors
+        let personalizedBoost = 0;
+        
+        if (userPreferences) {
+            // Boost content from followed users
+            const authorId = (item as FeedPost).authorId;
+            if (authorId && userPreferences.followedUsers?.includes(authorId)) {
+                personalizedBoost += 50;
+            }
+            
+            // Boost content matching user interests
+            const hashtags = (item as FeedPost).hashtags || [];
+            const interests = userPreferences.interests || [];
+            const matchingInterests = hashtags.filter(tag => 
+                interests.some(interest => interest.toLowerCase().includes(tag.toLowerCase()))
+            );
+            personalizedBoost += matchingInterests.length * 25;
+            
+            // Boost content type preferences
+            const contentType = (item as FeedPost).type;
+            if (contentType === 'announcement' && interests.includes('business_updates')) {
+                personalizedBoost += 30;
+            }
+            if (contentType === 'showcase' && interests.includes('success_stories')) {
+                personalizedBoost += 40;
+            }
+        }
+        
+        // Recency boost for very new content (first 2 hours)
+        const recencyBoost = hoursOld < 2 ? (2 - hoursOld) * 20 : 0;
+        
+        // Quality indicators
+        const qualityBoost = (item as FeedPost).mediaUrls?.length ? 15 : 0;
+        
+        return baseScore + featuredBoost + pinnedBoost + personalizedBoost + recencyBoost + qualityBoost;
     },
 
-    getAlgorithmicFeed: async (): Promise<(FeedPost | Event)[]> => {
+    getAlgorithmicFeed: async (userPreferences?: { interests?: string[], followedUsers?: string[] }): Promise<(FeedPost | Event)[]> => {
         try {
-            // Fetch posts and events in parallel
+            // Fetch posts and events in parallel with increased limits for better algorithm performance
             const [postsSnapshot, events] = await Promise.all([
-                getDocs(query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(50))),
+                getDocs(query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(100))),
                 getEvents()
             ]);
 
@@ -153,14 +187,79 @@ export const feedService = {
 
             const combined: (FeedPost | Event)[] = [...posts, ...events];
 
-            return combined.sort((a, b) => {
-                const scoreA = feedService.computeEngagementScore(a);
-                const scoreB = feedService.computeEngagementScore(b);
-                return scoreB - scoreA;
+            // Apply algorithmic scoring with personalization
+            const scoredItems = combined.map(item => ({
+                ...item,
+                _algorithmScore: feedService.computeEngagementScore(item, userPreferences)
+            }));
+
+            // Sort by engagement score and apply diversity filters
+            const sorted = scoredItems.sort((a, b) => {
+                return (b as any)._algorithmScore - (a as any)._algorithmScore;
+            });
+
+            // Apply diversity to prevent echo chambers
+            const diversified = feedService.applyDiversityFilter(sorted, userPreferences);
+            
+            // Remove the temporary score property
+            return diversified.map(item => {
+                const { _algorithmScore, ...cleanItem } = item as any;
+                return cleanItem;
             });
         } catch (error) {
             console.error("Error fetching algorithmic feed:", error);
             return [];
+        }
+    },
+
+    applyDiversityFilter: (items: any[], userPreferences?: { interests?: string[], followedUsers?: string[] }): any[] => {
+        const result: any[] = [];
+        const authorCounts: Record<string, number> = {};
+        const typeCounts: Record<string, number> = {};
+        const maxPerAuthor = 3;
+        const maxPerType = 5;
+
+        for (const item of items) {
+            const authorId = item.authorId || 'system';
+            const contentType = item.type || 'general';
+            
+            // Limit posts per author to prevent spam
+            if ((authorCounts[authorId] || 0) >= maxPerAuthor) {
+                continue;
+            }
+            
+            // Limit posts per type for diversity
+            if ((typeCounts[contentType] || 0) >= maxPerType) {
+                continue;
+            }
+            
+            result.push(item);
+            authorCounts[authorId] = (authorCounts[authorId] || 0) + 1;
+            typeCounts[contentType] = (typeCounts[contentType] || 0) + 1;
+            
+            // Limit total results for performance
+            if (result.length >= 50) {
+                break;
+            }
+        }
+
+        return result;
+    },
+
+    getUserPreferences: async (userId: string): Promise<{ interests?: string[], followedUsers?: string[] }> => {
+        try {
+            const userDoc = await getDoc(doc(db, 'users', userId));
+            if (userDoc.exists()) {
+                const userData = userDoc.data();
+                return {
+                    interests: userData.interests || [],
+                    followedUsers: userData.followedUsers || []
+                };
+            }
+            return {};
+        } catch (error) {
+            console.error("Error getting user preferences:", error);
+            return {};
         }
     },
 

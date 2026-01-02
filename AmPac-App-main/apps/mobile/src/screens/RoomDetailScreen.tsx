@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Linking } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../theme';
@@ -11,6 +11,7 @@ import { Timestamp } from 'firebase/firestore';
 import { pricingService } from '../services/pricing';
 import { graphCalendarService } from '../services/microsoftGraph';
 import { availabilityService } from '../services/availability';
+import { stripeService } from '../services/stripeService';
 import { Ionicons } from '@expo/vector-icons';
 import { notifySupportChannel } from '../services/notifications';
 
@@ -38,13 +39,14 @@ export default function RoomDetailScreen() {
         [room, slotStart, slotEnd, attendees]
     );
 
-    // Mock booking logic for MVP
+    // Enhanced booking logic with Stripe payment integration
     const handleBookNow = async () => {
         setLoading(true);
         try {
             const userId = getCurrentUserId();
             if (!userId) throw new Error("User not authenticated");
 
+            // Check availability first
             const availability = await availabilityService.checkItemsAvailability([{
                 roomId: room.id,
                 startTime: slotStart,
@@ -58,6 +60,7 @@ export default function RoomDetailScreen() {
                 return;
             }
 
+            // Create temporary hold
             const hold = await availabilityService.holdRooms([{
                 roomId: room.id,
                 startTime: slotStart,
@@ -65,45 +68,81 @@ export default function RoomDetailScreen() {
                 attendees,
             }]);
 
-            const graphEventId = await graphCalendarService.createRoomEvent({
-                roomId: room.id,
-                startTime: slotStart,
-                endTime: slotEnd,
-                status: 'confirmed',
-            }, room);
-
-            const booking: Omit<Booking, 'id'> = {
-                userId,
-                status: 'confirmed',
-                items: [{
-                    roomId: room.id,
-                    startTime: slotStart,
-                    endTime: slotEnd,
-                    attendees,
-                    status: 'confirmed',
-                    priceBreakdown: pricing.priceBreakdown,
-                    graphEventId,
-                }],
-                totalPrice: pricing.priceBreakdown.total,
-                createdAt: Timestamp.now(),
-                holdExpiresAt: hold.expiresAt,
-                holdId: hold.holdId,
-            };
-
-            await createBooking(booking);
-            // Fire-and-forget support notification (server-side Teams webhook)
-            notifySupportChannel({
-                title: 'New Room Booking',
-                body: `Room: ${room.name} (${room.id})\nStart: ${slotStart.toDate().toISOString()}\nEnd: ${slotEnd.toDate().toISOString()}\nAttendees: ${attendees}\nTotal: ${pricing.priceBreakdown.total}`,
+            // Create Stripe payment session for room booking
+            const bookingId = `booking_${Date.now()}`;
+            const paymentSession = await stripeService.createRoomBookingSession({
+                bookingId,
+                amount: Math.round(pricing.priceBreakdown.total * 100), // Convert to cents
+                roomName: room.name,
+                startTime: slotStart.toDate().toLocaleString(),
+                endTime: slotEnd.toDate().toLocaleString(),
             });
 
+            // Show payment confirmation dialog
             Alert.alert(
-                'Booking Confirmed',
-                `You have booked ${room.name} for ${durationHours} hour${durationHours > 1 ? 's' : ''}.`,
-                [{ text: 'OK', onPress: () => navigation.goBack() }]
+                'Confirm Payment',
+                `Total: $${pricing.priceBreakdown.total.toFixed(2)}\n\nYou will be redirected to Stripe for secure payment.`,
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { 
+                        text: 'Pay Now', 
+                        onPress: async () => {
+                            try {
+                                // Redirect to Stripe checkout
+                                await Linking.openURL(paymentSession.url);
+                                
+                                // Create calendar event (optimistic)
+                                const graphEventId = await graphCalendarService.createRoomEvent({
+                                    roomId: room.id,
+                                    startTime: slotStart,
+                                    endTime: slotEnd,
+                                    status: 'confirmed',
+                                }, room);
+
+                                // Create booking record (pending payment confirmation)
+                                const booking: Omit<Booking, 'id'> = {
+                                    userId,
+                                    status: 'pending', // Will be updated to 'confirmed' after payment
+                                    items: [{
+                                        roomId: room.id,
+                                        startTime: slotStart,
+                                        endTime: slotEnd,
+                                        attendees,
+                                        status: 'pending',
+                                        priceBreakdown: pricing.priceBreakdown,
+                                        graphEventId,
+                                    }],
+                                    totalPrice: pricing.priceBreakdown.total,
+                                    createdAt: Timestamp.now(),
+                                    holdExpiresAt: hold.expiresAt,
+                                    holdId: hold.holdId,
+                                    paymentSessionId: paymentSession.sessionId,
+                                };
+
+                                await createBooking(booking);
+
+                                // Fire-and-forget support notification
+                                notifySupportChannel({
+                                    title: 'New Room Booking (Payment Pending)',
+                                    body: `Room: ${room.name} (${room.id})\nStart: ${slotStart.toDate().toISOString()}\nEnd: ${slotEnd.toDate().toISOString()}\nAttendees: ${attendees}\nTotal: $${pricing.priceBreakdown.total}\nPayment Session: ${paymentSession.sessionId}`,
+                                });
+
+                                Alert.alert(
+                                    'Payment Initiated',
+                                    'Your booking is being processed. You will receive a confirmation once payment is complete.',
+                                    [{ text: 'OK', onPress: () => navigation.goBack() }]
+                                );
+                            } catch (paymentError) {
+                                console.error('Payment error:', paymentError);
+                                Alert.alert('Payment Error', 'Failed to process payment. Please try again.');
+                            }
+                        }
+                    }
+                ]
             );
         } catch (error) {
-            Alert.alert('Error', 'Failed to book room. Please try again.');
+            console.error('Booking error:', error);
+            Alert.alert('Error', 'Failed to initiate booking. Please try again.');
         } finally {
             setLoading(false);
         }

@@ -350,6 +350,7 @@ export interface Booking {
     createdAt: Timestamp;
     holdExpiresAt?: Timestamp;
     holdId?: string;
+    paymentSessionId?: string; // Stripe payment session ID for tracking
 }
 
 export interface Business {

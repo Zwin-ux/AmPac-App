@@ -126,6 +126,7 @@ export default function CopilotSidebar() {
                         onClick={() => setIsMinimized(true)}
                         className="p-1 hover:bg-gray-200 rounded text-textSecondary"
                         title="Minimize"
+                        aria-label="Minimize Copilot"
                     >
                         <ChevronDown className="w-5 h-5" />
                     </button>
@@ -133,6 +134,7 @@ export default function CopilotSidebar() {
                         onClick={() => setIsOpen(false)}
                         className="p-1 hover:bg-gray-200 rounded text-textSecondary"
                         title="Close"
+                        aria-label="Close Copilot"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -196,6 +198,8 @@ export default function CopilotSidebar() {
                         onClick={handleSend}
                         disabled={!inputText.trim() || isLoading}
                         className="p-2 bg-primary text-white rounded hover:bg-primaryLight disabled:opacity-50 disabled:cursor-not-allowed"
+                        aria-label="Send message"
+                        title="Send message"
                     >
                         <Send className="w-4 h-4" />
                     </button>

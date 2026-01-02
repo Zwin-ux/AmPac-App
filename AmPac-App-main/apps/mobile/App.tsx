@@ -5,14 +5,10 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import { STRIPE_CONFIG } from './src/config';
-import { logConfigurationStatus } from './src/utils/configValidator';
 
-// Initialize Sentry as early as possible
-// import { initSentry } from './src/services/sentry';
-// initSentry();
-
-// Log configuration status on app startup
-logConfigurationStatus();
+// Configuration validation disabled for v1 launch - Brain API removed
+// import { logConfigurationStatus } from './src/utils/configValidator';
+// logConfigurationStatus();
 
 // Screens
 import SignInScreen from './src/screens/SignInScreen';
@@ -69,9 +65,10 @@ function SpacesNavigator() {
   );
 }
 
-// New Import
 import SocialHubScreen from './src/screens/SocialHubScreen';
 import DirectMessagesScreen from './src/screens/DirectMessagesScreen';
+import { telemetryService } from './src/services/telemetry';
+import { performanceMonitor } from './src/services/performanceMonitor';
 
 function MainTabs() {
   return (
@@ -123,9 +120,21 @@ function AppStack() {
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
+    // Start measuring cold start performance
+    performanceMonitor.measureColdStart();
+    
+    // Start measuring auth check
+    performanceMonitor.measureAuthCheck();
+
     const unsubscribe = userStore.subscribe((u) => {
       setUser(u);
       setLoading(false);
+      
+      // Complete auth check measurement
+      performanceMonitor.completeAuthCheck();
+      
+      // Start navigation ready measurement
+      performanceMonitor.measureNavigationReady();
     });
 
     const authUnsubscribe = onAuthStateChanged(auth, async (u) => {
@@ -136,11 +145,15 @@ function AppStack() {
       }
     });
 
+    // Hydrate user store first
     userStore.hydrateFromStorage();
 
-    // Initialize AMPAC business on first launch
+    // Initialize AMPAC business AFTER a delay to ensure Firebase is ready
     const initializeAmpac = async () => {
       try {
+        // Wait a bit to ensure Firebase is fully initialized
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
         const exists = await checkIfAmpacExists();
         if (!exists) {
           console.log('🏢 Seeding AMPAC business...');
@@ -149,21 +162,19 @@ function AppStack() {
         }
       } catch (error) {
         console.error('❌ Error initializing AMPAC business:', error);
+        // Don't re-throw - this is not critical for app startup
       }
     };
-    initializeAmpac();
+    
+    // Call with proper error handling and delay
+    setTimeout(() => {
+      initializeAmpac().catch(error => {
+        console.error('❌ AMPAC initialization failed:', error);
+      });
+    }, 3000); // Wait 3 seconds after app start
 
-    // Initialize push notifications when user is available
-    if (user?.uid) {
-      pushNotificationService.initialize(user.uid).catch(error => {
-        console.error('❌ Error initializing push notifications:', error);
-      });
-      
-      // Initialize direct messaging service
-      directMessageService.initialize().catch(error => {
-        console.error('❌ Error initializing direct messaging:', error);
-      });
-    }
+    // Track app open
+    telemetryService.track({ type: 'app_open', screen: 'Splash' });
 
     return () => {
       unsubscribe();
@@ -172,6 +183,20 @@ function AppStack() {
       directMessageService.cleanup();
     };
   }, []);
+
+  // Complete performance measurements when navigation is ready
+  React.useEffect(() => {
+    if (!loading) {
+      // Complete cold start measurement
+      performanceMonitor.completeColdStart();
+      
+      // Complete navigation ready measurement
+      performanceMonitor.completeNavigationReady();
+      
+      // Complete overall app launch measurement
+      performanceMonitor.completeAppLaunch();
+    }
+  }, [loading]);
 
   // Notification Listener
   const { showToast } = useToast();

@@ -5,11 +5,13 @@ from app.core.config import get_settings
 import asyncio
 from app.services.sync_service import SyncService
 from fastapi.staticfiles import StaticFiles
-from app.api.routers import chat, documents, agents, knowledge, ventures, calendar, assistant, health, support
+from app.api.routers import chat, documents, agents, knowledge, ventures, calendar, assistant, health, support, performance
 from app.core.logging_config import init_logging
 from app.core.middleware import RequestContextMiddleware, RateLimitingMiddleware, APIKeyMiddleware
 from app.core.sentry import init_sentry
+from app.services.performance_monitor import record_api_performance
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +49,34 @@ async def global_exception_handler(request: Request, exc: Exception):
         status_code=500,
         content={"detail": "An internal error occurred. Please try again later."}
     )
+
+# Performance monitoring middleware
+@app.middleware("http")
+async def performance_monitoring_middleware(request: Request, call_next):
+    """Middleware to automatically track API performance metrics."""
+    start_time = time.time()
+    
+    # Process request
+    response = await call_next(request)
+    
+    # Calculate duration
+    duration = time.time() - start_time
+    
+    # Record performance metrics
+    try:
+        await record_api_performance(
+            endpoint=str(request.url.path),
+            method=request.method,
+            duration=duration,
+            status_code=response.status_code
+        )
+    except Exception as e:
+        logger.error(f"Error recording API performance: {e}")
+    
+    # Add performance headers
+    response.headers["X-Response-Time"] = f"{duration:.3f}s"
+    
+    return response
 
 # CORS
 app.add_middleware(
@@ -104,6 +134,7 @@ app.include_router(m365.router, prefix=f"{settings.API_V1_STR}/m365", tags=["m36
 app.include_router(applications.router, prefix=f"{settings.API_V1_STR}/applications", tags=["applications"])
 app.include_router(stripe.router, prefix=f"{settings.API_V1_STR}/stripe", tags=["stripe"])
 app.include_router(health.router, prefix=f"{settings.API_V1_STR}/health", tags=["health"])
+app.include_router(performance.router, prefix=f"{settings.API_V1_STR}/performance", tags=["performance"])
 
 if __name__ == "__main__":
     import uvicorn

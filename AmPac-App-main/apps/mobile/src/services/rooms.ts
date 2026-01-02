@@ -85,44 +85,44 @@ export const getRooms = async (forceRefresh = false): Promise<Room[]> => {
         const snapshot = await getDocs(roomsCol);
         const rooms = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Room));
 
-        // Fallback mock data if empty (for MVP demo)
+        // AmPac Business Capital actual rooms
         if (rooms.length === 0) {
             roomsCache = [
                 {
-                    id: 'room-1',
-                    name: 'Conference Room A',
+                    id: 'resource-partner-conference-room',
+                    name: 'Resource Partner Conference Room',
+                    capacity: 12,
+                    pricePerHour: 75,
+                    amenities: ['4K Display', 'Video Conferencing', 'Whiteboard', 'WiFi', 'Conference Phone', 'Presentation Remote', 'Coffee Service'],
+                    description: 'Professional conference room designed for resource partner meetings, client presentations, and strategic planning sessions. Features premium AV equipment and comfortable seating for up to 12 participants.',
+                    location: 'AmPac Business Capital HQ',
+                    timezone: 'America/Los_Angeles',
+                    graphResourceId: 'resource-partner-conference@ampac.com',
+                    pricingRules: buildMockPricingRules({ id: 'resource-partner-conference-room', name: 'Resource Partner Conference Room', capacity: 12, pricePerHour: 75, amenities: [] }),
+                },
+                {
+                    id: 'collaboration-center-conference-room',
+                    name: 'Collaboration Center Conference Room',
                     capacity: 8,
-                    pricePerHour: 50,
-                    amenities: ['WiFi', 'Projector', 'Whiteboard'],
-                    description: 'Perfect for board meetings and client presentations.',
-                    location: 'Riverside HQ',
+                    pricePerHour: 60,
+                    amenities: ['Smart TV', 'Video Conferencing', 'Whiteboard', 'WiFi', 'Wireless Presentation', 'Natural Light', 'Ergonomic Seating'],
+                    description: 'Modern collaboration space perfect for team meetings, brainstorming sessions, and client consultations. Designed to foster creativity and productive discussions with flexible seating arrangements.',
+                    location: 'AmPac Business Capital HQ',
                     timezone: 'America/Los_Angeles',
-                    graphResourceId: 'graph-room-1',
-                    pricingRules: buildMockPricingRules({ id: 'room-1', name: 'Conference Room A', capacity: 8, pricePerHour: 50, amenities: [] }),
+                    graphResourceId: 'collaboration-center-conference@ampac.com',
+                    pricingRules: buildMockPricingRules({ id: 'collaboration-center-conference-room', name: 'Collaboration Center Conference Room', capacity: 8, pricePerHour: 60, amenities: [] }),
                 },
                 {
-                    id: 'room-2',
-                    name: 'Focus Pod',
-                    capacity: 1,
-                    pricePerHour: 15,
-                    amenities: ['WiFi', 'Soundproof'],
-                    description: 'Quiet space for deep work.',
-                    location: 'Riverside HQ',
-                    timezone: 'America/Los_Angeles',
-                    graphResourceId: 'graph-room-2',
-                    pricingRules: buildMockPricingRules({ id: 'room-2', name: 'Focus Pod', capacity: 1, pricePerHour: 15, amenities: [] }),
-                },
-                {
-                    id: 'room-3',
-                    name: 'Training Center',
+                    id: 'business-acumen-center',
+                    name: 'Business Acumen Center',
                     capacity: 20,
                     pricePerHour: 100,
-                    amenities: ['WiFi', 'Projector', 'Whiteboard', 'Catering'],
-                    description: 'Large space for workshops and training sessions.',
-                    location: 'Ontario Hub',
+                    amenities: ['Dual Projectors', 'Sound System', 'Microphones', 'WiFi', 'Whiteboard', 'Flip Charts', 'Training Materials', 'Catering Setup'],
+                    description: 'Comprehensive training and education center designed for workshops, seminars, and business development sessions. Ideal for entrepreneur training programs, SBA workshops, and large group presentations.',
+                    location: 'AmPac Business Capital HQ',
                     timezone: 'America/Los_Angeles',
-                    graphResourceId: 'graph-room-3',
-                    pricingRules: buildMockPricingRules({ id: 'room-3', name: 'Training Center', capacity: 20, pricePerHour: 100, amenities: [] }),
+                    graphResourceId: 'business-acumen-center@ampac.com',
+                    pricingRules: buildMockPricingRules({ id: 'business-acumen-center', name: 'Business Acumen Center', capacity: 20, pricePerHour: 100, amenities: [] }),
                 }
             ];
             // Save to persistent cache

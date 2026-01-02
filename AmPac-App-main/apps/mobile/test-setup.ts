@@ -5,6 +5,15 @@ jest.mock('@react-native-async-storage/async-storage', () =>
     require('@react-native-async-storage/async-storage/jest/async-storage-mock')
 );
 
+// Mock Firebase Config
+jest.mock('./firebaseConfig', () => ({
+    db: {},
+    auth: {
+        currentUser: { uid: 'test-user-id', displayName: 'Test User' },
+    },
+    app: {},
+}));
+
 // Mock Firebase
 jest.mock('firebase/app', () => ({
     initializeApp: jest.fn(),
@@ -44,6 +53,18 @@ jest.mock('firebase/firestore', () => ({
     arrayRemove: jest.fn(),
 }));
 
+jest.mock('firebase/storage', () => ({
+    getStorage: jest.fn(),
+    ref: jest.fn(),
+    uploadBytes: jest.fn(),
+    getDownloadURL: jest.fn(),
+}));
+
+// Mock auth utils
+jest.mock('./src/services/authUtils', () => ({
+    getCurrentUserId: jest.fn(() => 'test-user-id'),
+}));
+
 // Mock Expo constants
 jest.mock('expo-constants', () => ({
     manifest: { extra: {} },
@@ -61,4 +82,88 @@ jest.mock('expo-auth-session', () => ({
     })),
     exchangeCodeAsync: jest.fn(),
     ResponseType: { Code: 'code' },
+}));
+
+// Mock Expo Document Picker
+jest.mock('expo-document-picker', () => ({
+    getDocumentAsync: jest.fn(),
+    DocumentPickerOptions: {},
+}));
+
+// Mock Expo Image Manipulator
+jest.mock('expo-image-manipulator', () => ({
+    manipulateAsync: jest.fn(),
+    SaveFormat: {
+        JPEG: 'jpeg',
+        PNG: 'png',
+    },
+}));
+
+// Mock Expo Vector Icons
+jest.mock('@expo/vector-icons', () => ({
+    Ionicons: 'Ionicons',
+    AntDesign: 'AntDesign',
+    MaterialIcons: 'MaterialIcons',
+}));
+
+// Mock React Native components
+jest.mock('react-native', () => {
+    const mockAnimatedValue = {
+        setValue: jest.fn(),
+    };
+    
+    const mockAnimatedTiming = {
+        start: jest.fn(),
+    };
+    
+    return {
+        View: 'View',
+        Text: 'Text',
+        TouchableOpacity: 'TouchableOpacity',
+        StyleSheet: {
+            create: (styles: any) => styles,
+        },
+        Animated: {
+            Value: jest.fn(() => mockAnimatedValue),
+            timing: jest.fn(() => mockAnimatedTiming),
+            sequence: jest.fn(() => mockAnimatedTiming),
+            loop: jest.fn(() => mockAnimatedTiming),
+            View: 'Animated.View',
+        },
+    };
+});
+
+// Mock theme
+jest.mock('./src/theme', () => ({
+    theme: {
+        colors: {
+            primary: '#007AFF',
+            success: '#34C759',
+            error: '#FF3B30',
+            info: '#5AC8FA',
+            surface: '#FFFFFF',
+            text: '#000000',
+            textSecondary: '#666666',
+            border: '#E5E5E5',
+        },
+        borderRadius: {
+            md: 8,
+        },
+        shadows: {
+            float: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 4,
+                elevation: 3,
+            },
+            card: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.05,
+                shadowRadius: 2,
+                elevation: 1,
+            },
+        },
+    },
 }));

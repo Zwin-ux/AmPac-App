@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../theme';
 import { Room } from '../types';
 import { getRooms } from '../services/rooms';
-import AssistantBubble from '../components/AssistantBubble';
+
 import SkeletonLoader from '../components/SkeletonLoader';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -18,7 +18,7 @@ export default function SpacesScreen() {
     const [selectedRooms, setSelectedRooms] = useState<Record<string, Room>>({});
     const navigation = useNavigation<any>();
 
-    const categories = ['All', 'Meeting Room', 'Desk', 'Event Space', 'Private Office'];
+    const categories = ['All', 'Conference Room', 'Training Center', 'Meeting Space'];
 
     const fetchRooms = useCallback(async (force = false) => {
         const data = await getRooms(force);
@@ -168,7 +168,7 @@ export default function SpacesScreen() {
                     onRefresh={onRefresh}
                 />
             )}
-            <AssistantBubble context="spaces" />
+
             {selectionMode && Object.keys(selectedRooms).length > 0 && (
                 <View style={styles.floatingBar}>
                     <View>

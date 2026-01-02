@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../theme';
 import { useToast } from '../context/ToastContext';
+import { Button } from '../components/ui/Button';
 import { auth, db } from '../../firebaseConfig';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
@@ -265,20 +266,13 @@ export default function PreliminaryIntakeScreen({ navigation }: any) {
             </KeyboardAvoidingView>
 
             <View style={styles.footer}>
-                <TouchableOpacity
-                    style={styles.nextBtn}
+                <Button
+                    title={step === 5 ? 'Submit Inquiry' : 'Next'}
                     onPress={step === 5 ? handleSubmit : handleNext}
-                    disabled={loading}
-                >
-                    {loading ? (
-                        <ActivityIndicator color="#fff" />
-                    ) : (
-                        <>
-                            <Text style={styles.nextBtnText}>{step === 5 ? 'Submit Inquiry' : 'Next'}</Text>
-                            {step < 5 && <Ionicons name="arrow-forward" size={20} color="#fff" />}
-                        </>
-                    )}
-                </TouchableOpacity>
+                    loading={loading}
+                    icon={step < 5 ? <Ionicons name="arrow-forward" size={20} color="#fff" /> : undefined}
+                    style={styles.nextBtn}
+                />
             </View>
         </SafeAreaView>
     );

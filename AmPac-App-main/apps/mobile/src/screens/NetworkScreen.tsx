@@ -11,7 +11,7 @@ import { feedService } from '../services/feedService';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AMPAC_STAFF, StaffMember } from '../data/staff';
-import AssistantBubble from '../components/AssistantBubble';
+
 
 export default function NetworkScreen() {
     const [activeTab, setActiveTab] = useState<'businesses' | 'events' | 'feed' | 'staff'>('businesses');
@@ -436,7 +436,7 @@ export default function NetworkScreen() {
                 </View>
             </Modal>
 
-            <AssistantBubble context="network" />
+
         </SafeAreaView>
     );
 }

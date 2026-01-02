@@ -9,13 +9,13 @@ import { getEvents, createEvent } from '../services/events';
 import { feedService } from '../services/feedService';
 import { chatService } from '../services/chatService';
 import { businessService } from '../services/businessService';
-import { getCurrentUserId, isDevUser } from '../services/authUtils';
+import { getCurrentUserId } from '../services/authUtils';
 import { Ionicons } from '@expo/vector-icons';
 import { format, formatDistanceToNow } from 'date-fns';
 import { auth } from '../../firebaseConfig';
 import { Timestamp } from 'firebase/firestore';
 import { AMPAC_STAFF, StaffMember } from '../data/staff';
-import AssistantBubble from '../components/AssistantBubble';
+
 import { useToast } from '../context/ToastContext';
 import EmptyState from '../components/ui/EmptyState';
 import SkeletonLoader from '../components/SkeletonLoader';

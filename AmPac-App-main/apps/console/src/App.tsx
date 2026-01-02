@@ -15,6 +15,7 @@ import MarketplaceConfigPage from './pages/MarketplaceConfigPage';
 import CommunityManagementPage from './pages/CommunityManagementPage';
 import BusinessDirectoryPage from './pages/BusinessDirectoryPage';
 import OpsConsolePage from './pages/OpsConsolePage';
+import MobileCommandPage from './pages/MobileCommandPage';
 import DashboardLayout from './layouts/DashboardLayout';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { useNotifications } from './hooks/useNotifications';
@@ -55,6 +56,7 @@ export default function App() {
           <Route path="community" element={<CommunityManagementPage />} />
           <Route path="businesses" element={<BusinessDirectoryPage />} />
           <Route path="ops" element={<OpsConsolePage />} />
+          <Route path="mobile-command" element={<MobileCommandPage />} />
           <Route path="admin" element={<AdminPage />} />
         </Route>
       </Routes>

@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '../utils/asyncStorageOptimization';
 import { DirectMessage, DirectConversation, User } from '../types';
 
 export interface CachedData {

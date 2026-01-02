@@ -49,10 +49,10 @@ export default function ApplicationScreen() {
     };
 
 
-    const evaluateEligibility = () => {
+    const evaluateEligibility = async () => {
         // Use the extracted loan eligibility service for testability
-        const result = evaluateLoanEligibility(answers);
-        
+        const result = await evaluateLoanEligibility(answers);
+
         setReasons(result.issues);
         setSuggestions(result.suggestions);
         setStep(result.step);
@@ -145,7 +145,7 @@ export default function ApplicationScreen() {
                     <Text style={styles.subtitle}>
                         While you may not qualify for our standard SBA program, we have other funding solutions that might be perfect for your business.
                     </Text>
-                    
+
                     {suggestions.length > 0 && (
                         <View style={styles.suggestionCard}>
                             <Text style={styles.suggestionTitle}>Recommended for you:</Text>
@@ -169,8 +169,8 @@ export default function ApplicationScreen() {
                         onPress={async () => {
                             // Notify support team about alternative product interest
                             await supportNotificationService.notifyAlternativeProductInterest(
-                                answers.amount, 
-                                answers.years, 
+                                answers.amount,
+                                answers.years,
                                 suggestions.join('; ')
                             );
                             navigation.navigate('Support' as never);
@@ -178,7 +178,7 @@ export default function ApplicationScreen() {
                         style={styles.portalButton}
                         textStyle={{ fontSize: 18, fontWeight: 'bold' }}
                     />
-                    
+
                     <Button
                         title="Continue to Standard Application"
                         onPress={async () => {
@@ -187,11 +187,11 @@ export default function ApplicationScreen() {
                             handleOpenPortal();
                         }}
                         variant="secondary"
-                        style={{ marginTop: 12 }}
+                        style={{ marginTop: 12, width: '100%' }}
                     />
-                    
+
                     <TouchableOpacity onPress={() => setStep('intro')} style={{ marginTop: 20 }}>
-                        <Text style={{ color: theme.colors.textSecondary }}>Start Over</Text>
+                        <Text style={{ color: theme.colors.textSecondary, fontWeight: '600' }}>Start Over</Text>
                     </TouchableOpacity>
                 </View>
             );
@@ -249,7 +249,7 @@ export default function ApplicationScreen() {
                         textStyle={{ fontSize: 18, fontWeight: 'bold' }}
                     />
                     <TouchableOpacity onPress={() => setStep('intro')} style={{ marginTop: 24 }}>
-                        <Text style={{ color: theme.colors.textSecondary, fontSize: 16 }}>Start Over</Text>
+                        <Text style={{ color: theme.colors.textSecondary, fontSize: 16, fontWeight: '600' }}>Start Over</Text>
                     </TouchableOpacity>
                 </View>
             );

@@ -9,6 +9,7 @@ import * as fc from 'fast-check';
 import {
     getLoanProductType,
     evaluateEligibility,
+    evaluateEligibilitySync,
     hasActionableNextSteps,
     PreQualAnswers,
     EligibilityResult,
@@ -40,9 +41,9 @@ describe('Loan Eligibility Service', () => {
         });
     });
 
-    describe('evaluateEligibility', () => {
+    describe('evaluateEligibility (sync version)', () => {
         it('should return eligible for valid standard loan application', () => {
-            const result = evaluateEligibility({
+            const result = evaluateEligibilitySync({
                 isOwner: true,
                 amount: '100000',
                 years: '3',
@@ -54,7 +55,7 @@ describe('Loan Eligibility Service', () => {
         });
 
         it('should suggest alternatives for amounts < $5,000', () => {
-            const result = evaluateEligibility({
+            const result = evaluateEligibilitySync({
                 isOwner: true,
                 amount: '3000',
                 years: '3',
@@ -65,7 +66,7 @@ describe('Loan Eligibility Service', () => {
         });
 
         it('should suggest micro-loan for amounts $5,000-$49,999', () => {
-            const result = evaluateEligibility({
+            const result = evaluateEligibilitySync({
                 isOwner: true,
                 amount: '25000',
                 years: '3',
@@ -76,7 +77,7 @@ describe('Loan Eligibility Service', () => {
         });
 
         it('should add issue for non-owner applicants', () => {
-            const result = evaluateEligibility({
+            const result = evaluateEligibilitySync({
                 isOwner: false,
                 amount: '100000',
                 years: '3',
@@ -85,7 +86,7 @@ describe('Loan Eligibility Service', () => {
         });
 
         it('should add issue for amounts over $5,000,000', () => {
-            const result = evaluateEligibility({
+            const result = evaluateEligibilitySync({
                 isOwner: true,
                 amount: '6000000',
                 years: '3',
@@ -94,12 +95,48 @@ describe('Loan Eligibility Service', () => {
         });
 
         it('should suggest startup programs for businesses < 1 year old', () => {
-            const result = evaluateEligibility({
+            const result = evaluateEligibilitySync({
                 isOwner: true,
                 amount: '100000',
                 years: '0.5',
             });
             expect(result.suggestions.some(s => s.includes('startup'))).toBe(true);
+        });
+    });
+
+    describe('evaluateEligibility (async enhanced version)', () => {
+        it('should return enhanced analysis when sufficient data provided', async () => {
+            const result = await evaluateEligibility({
+                isOwner: true,
+                amount: '100000',
+                years: '3',
+                creditScore: 720,
+                annualRevenue: 500000,
+                industry: '541211', // CPA offices - low risk
+                businessType: 'LLC',
+                state: 'TX'
+            });
+            
+            expect(result.eligible).toBe(true);
+            expect(result.step).toBe('eligible');
+            expect(result.productType).toBe('standard');
+            expect(result.score).toBeDefined();
+            expect(result.confidence).toBeDefined();
+            expect(result.detailedAnalysis).toBeDefined();
+        });
+
+        it('should fall back to basic evaluation when enhanced data missing', async () => {
+            const result = await evaluateEligibility({
+                isOwner: true,
+                amount: '100000',
+                years: '3',
+            });
+            
+            expect(result.eligible).toBe(true);
+            expect(result.step).toBe('eligible');
+            expect(result.productType).toBe('standard');
+            expect(result.score).toBeUndefined();
+            expect(result.confidence).toBeUndefined();
         });
     });
 
@@ -187,7 +224,7 @@ describe('Property-Based Tests: Loan Amount Routing', () => {
                     years: fc.float({ min: 0.5, max: 50, noNaN: true }).map(n => n.toFixed(1)),
                 }),
                 (answers: PreQualAnswers) => {
-                    const result = evaluateEligibility(answers);
+                    const result = evaluateEligibilitySync(answers);
                     const amount = parseFloat(answers.amount);
                     
                     // Product type should match the routing rules
@@ -232,7 +269,7 @@ describe('Property-Based Tests: Eligibility Next Steps', () => {
                     ),
                 }),
                 (answers: PreQualAnswers) => {
-                    const result = evaluateEligibility(answers);
+                    const result = evaluateEligibilitySync(answers);
                     
                     // Every result should have actionable next steps
                     expect(hasActionableNextSteps(result)).toBe(true);
@@ -253,7 +290,7 @@ describe('Property-Based Tests: Eligibility Next Steps', () => {
                     years: fc.float({ min: Math.fround(0.1), max: 50, noNaN: true }).map(n => n.toFixed(1)),
                 }),
                 (answers: PreQualAnswers) => {
-                    const result = evaluateEligibility(answers);
+                    const result = evaluateEligibilitySync(answers);
                     
                     // If ineligible, should still have support contact as next step
                     // (hasActionableNextSteps returns true for all cases)

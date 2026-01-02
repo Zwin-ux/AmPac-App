@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../theme';
 import { ApplicationType, QuickApplyData } from '../types';
 import { applicationStore } from '../services/applicationStore';
-import { getFirebaseIdToken } from '../services/brainAuth';
+import { auth } from '../../firebaseConfig';
 
 interface QuickApplySheetProps {
     visible: boolean;
@@ -69,62 +69,11 @@ export default function QuickApplySheet({ visible, onClose, onSuccess, prefill }
     };
 
     const handleOCR = async () => {
-        try {
-            const result = await DocumentPicker.getDocumentAsync({
-                type: ['image/*', 'application/pdf'],
-            });
-
-            if (result.canceled) return;
-
-            setScanning(true);
-            const asset = result.assets[0];
-
-            // Create form data
-            const formData = new FormData();
-            formData.append('file', {
-                uri: asset.uri,
-                name: asset.name,
-                type: asset.mimeType || 'application/pdf',
-            } as any);
-
-            // Upload to backend
-            const { API_URL } = await import('../config');
-            const token = await getFirebaseIdToken();
-            const response = await fetch(`${API_URL}/documents/upload`, {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                    'Authorization': `Bearer ${token}`,
-                },
-            });
-
-            if (!response.ok) {
-                throw new Error('Upload failed');
-            }
-
-            const data = await response.json();
-
-            // Poll for result (Mocking the poll for now, assuming fast analysis)
-            // In real app, we'd listen to Firestore or poll status
-            await new Promise(resolve => setTimeout(resolve, 3000));
-
-            // Mock response since we don't have real OCR yet
-            // The backend agent just returns a string, it doesn't actually update Firestore for the mobile app to read yet
-            // So we'll keep the mock data for the UI feedback loop
-            setBusinessName("Acme Corp (Scanned)");
-            setPhone("(555) 999-8888");
-            setLoanAmount("250000");
-            setFullName("John Doe");
-
-            Alert.alert("Success", "Document analyzed! Fields pre-filled.");
-
-        } catch (e) {
-            console.error(e);
-            Alert.alert("Error", "Failed to scan document. Please try again.");
-        } finally {
-            setScanning(false);
-        }
+        // Brain API OCR disabled for v1 launch
+        Alert.alert(
+            'Coming Soon',
+            'Document scanning will be available in the next update. Please enter your information manually for now.'
+        );
     };
 
     const formatCurrency = (value: string) => {

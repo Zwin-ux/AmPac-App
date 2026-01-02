@@ -47,9 +47,7 @@ jest.mock('../../firebaseConfig', () => ({
     },
 }));
 
-jest.mock('./brainAuth', () => ({
-    getFirebaseIdToken: jest.fn(() => Promise.resolve('mock-token')),
-}));
+// Brain API mock removed for v1 launch
 
 jest.mock('./authUtils', () => ({
     getCurrentUserId: jest.fn(() => 'test-user-id'),

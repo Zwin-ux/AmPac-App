@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, FileText, Settings, LogOut, Menu, X, Activity, Brain, CreditCard, MessageSquare, Shield, Megaphone, Building2 } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Settings, LogOut, Menu, X, Activity, Brain, CreditCard, MessageSquare, Shield, Megaphone, Building2, Smartphone } from 'lucide-react';
 import { useMsal } from "@azure/msal-react";
 import CopilotSidebar from '../components/CopilotSidebar';
 
@@ -30,6 +30,7 @@ export default function DashboardLayout() {
 
     const navItems = [
         { icon: LayoutDashboard, label: 'Workboard', path: '/' },
+        { icon: Smartphone, label: 'Mobile Command', path: '/mobile-command' },
         { icon: Shield, label: 'Ops Console', path: '/ops' },
         { icon: Users, label: 'Staff Directory', path: '/admin' },
         { icon: FileText, label: 'Applications', path: '/search' },

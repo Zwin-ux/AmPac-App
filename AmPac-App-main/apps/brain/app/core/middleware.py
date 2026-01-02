@@ -74,7 +74,7 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
 class APIKeyMiddleware(BaseHTTPMiddleware):
     """
     Optional API key validation middleware.
-    When BRAIN_API_KEY is set, requires X-API-Key header for non-public endpoints.
+    When BRAIN_API_KEY is set, requires X-API-Key header OR valid Authorization Bearer token for non-public endpoints.
     """
     # Paths that don't require API key (public endpoints)
     PUBLIC_PATHS = {
@@ -85,6 +85,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         "/openapi.json",
         "/api/v1/openapi.json",
         "/static",
+        "/api/v1/health",
     }
     
     def __init__(self, app, api_key: str | None = None):
@@ -101,13 +102,21 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         if any(path.startswith(p) for p in self.PUBLIC_PATHS):
             return await call_next(request)
         
-        # Check API key header
+        # Check API key header first
         provided_key = request.headers.get("X-API-Key")
-        if provided_key != self.api_key:
-            logger.warning(f"Invalid API key attempt from {request.client.host}")
-            return Response(
-                content="Invalid or missing API key",
-                status_code=401
-            )
+        if provided_key == self.api_key:
+            return await call_next(request)
         
-        return await call_next(request)
+        # Check Authorization header for Bearer token (Firebase or JWT)
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[7:].strip()
+            if token:
+                # Token validation will be done by the route handlers
+                return await call_next(request)
+        
+        logger.warning(f"Invalid API key/token attempt from {request.client.host}")
+        return Response(
+            content="Invalid or missing API key/token",
+            status_code=401
+        )

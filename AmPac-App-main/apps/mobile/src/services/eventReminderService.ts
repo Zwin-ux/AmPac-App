@@ -3,16 +3,20 @@ import { collection, query, where, getDocs, Timestamp, addDoc } from 'firebase/f
 import { db, auth } from '../../firebaseConfig';
 import type { Event } from '../types';
 
-// Configure notification handler
-Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-        shouldShowBanner: true,
-        shouldShowList: true,
-    }),
-});
+// Configure notification handler - wrapped in try-catch to prevent crash on module load
+try {
+    Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+            shouldShowAlert: true,
+            shouldPlaySound: true,
+            shouldSetBadge: true,
+            shouldShowBanner: true,
+            shouldShowList: true,
+        }),
+    });
+} catch (error) {
+    console.warn('[EventReminder] Failed to set notification handler:', error);
+}
 
 export interface EventReminder {
     id: string;

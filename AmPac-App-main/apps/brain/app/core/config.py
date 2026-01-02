@@ -66,6 +66,10 @@ class Settings(BaseSettings):
     # Error Tracking
     SENTRY_DSN: Optional[str] = None
     
+    # Redis Cache
+    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_ENABLED: bool = True
+    
     # API Security
     BRAIN_API_KEY: Optional[str] = None
     JWT_SECRET: str = "ampac-secret-key-change-in-production"

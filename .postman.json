@@ -125,6 +125,32 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Redis Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}{{apiVersion}}/health/redis",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "health", "redis"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Performance Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}{{apiVersion}}/health/performance",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "health", "performance"]
+            }
+          },
+          "response": []
         }
       ]
     },
@@ -479,7 +505,95 @@
       ]
     },
     {
-      "name": "Local Development",
+      "name": "Performance & Caching",
+      "item": [
+        {
+          "name": "Get Performance Metrics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{firebaseToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiVersion}}/performance/metrics",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "performance", "metrics"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Cache Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{firebaseToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiVersion}}/performance/cache/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "performance", "cache", "stats"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Clear Cache",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{firebaseToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiVersion}}/performance/cache/clear",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "performance", "cache", "clear"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Test Redis Connection",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{firebaseToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key\": \"test_key\",\n  \"value\": \"test_value\",\n  \"ttl\": 300\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{apiVersion}}/performance/cache/test",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "performance", "cache", "test"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
       "item": [
         {
           "name": "Local Health Check",
@@ -581,38 +695,51 @@
     }
   ],
   "testResults": {
-    "lastRun": "2025-12-24T19:15:00.000Z",
-    "totalRequests": 9,
-    "failedRequests": 8,
-    "successRate": "11.1%",
-    "status": "EMERGENCY",
+    "lastRun": "2025-12-29T20:30:00.000Z",
+    "totalRequests": 13,
+    "failedRequests": 12,
+    "successRate": "7.7%",
+    "status": "CRITICAL",
     "serviceStatus": "DOWN",
     "issues": [
       {
         "type": "Service Unavailable",
-        "severity": "Emergency",
-        "description": "Brain API service completely down - all revisions failing to start",
+        "severity": "Critical",
+        "description": "Brain API service completely down - all endpoints returning 403 Forbidden",
         "affectedEndpoints": ["ALL"],
-        "rootCause": "Container startup failures, Firebase permission errors, environment variable mismatch",
-        "recommendedFix": "Execute emergency recovery plan in brain-api-emergency-fix.md"
+        "rootCause": "Service deployment issues, authentication middleware blocking all requests",
+        "recommendedFix": "Redeploy Brain API service with correct configuration"
+      },
+      {
+        "type": "Redis Integration",
+        "severity": "Unknown",
+        "description": "Redis dependency added to requirements.txt but service unavailable for testing",
+        "affectedEndpoints": ["/health/redis", "/performance/cache/*"],
+        "rootCause": "Cannot test Redis functionality due to service being down",
+        "recommendedFix": "Deploy service first, then test Redis integration"
       }
     ]
   },
   "recommendations": [
     {
-      "priority": "P0-EMERGENCY",
-      "action": "Execute emergency service restoration",
-      "command": "See brain-api-emergency-fix.md for complete recovery plan"
+      "priority": "P0-CRITICAL",
+      "action": "Redeploy Brain API service",
+      "command": "cd AmPac-App-main/apps/brain && gcloud run deploy ampac-brain --source . --region us-central1 --set-env-vars BRAIN_API_KEY=9dbUrc3VKS8Xr2Ho2Q4tZQ427-LuqT2cJcDMilKqw-Y,REDIS_URL=redis://localhost:6379"
     },
     {
-      "priority": "P0-EMERGENCY", 
-      "action": "Fix Firebase service account permissions",
-      "command": "gcloud projects add-iam-policy-binding ampac-database --member='serviceAccount:381306899120-compute@developer.gserviceaccount.com' --role='roles/datastore.user'"
+      "priority": "P0-CRITICAL", 
+      "action": "Verify Redis configuration",
+      "command": "Check if Redis is properly configured in docker-compose.yml and environment variables"
     },
     {
-      "priority": "P0-EMERGENCY",
-      "action": "Deploy with correct environment variables",
-      "implementation": "Use BRAIN_API_KEY instead of API_KEY"
+      "priority": "P1-HIGH",
+      "action": "Test Redis integration after service recovery",
+      "implementation": "Run performance and caching endpoints to verify Redis functionality"
+    },
+    {
+      "priority": "P1-HIGH",
+      "action": "Update mobile app fallback mechanisms",
+      "implementation": "Ensure mobile app gracefully handles API unavailability"
     }
   ]
 }

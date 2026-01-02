@@ -53,12 +53,11 @@ class PreDeploymentValidator {
   validateEnvironmentConfig() {
     return new Promise((resolve) => {
       const envFiles = ['.env', '.env.production'];
+      // Brain API removed for v1 launch - Firebase only
       const requiredVars = [
         'EXPO_PUBLIC_FIREBASE_API_KEY',
         'EXPO_PUBLIC_FIREBASE_PROJECT_ID',
-        'EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY',
-        'EXPO_PUBLIC_BRAIN_API_URL',
-        'EXPO_PUBLIC_BRAIN_API_KEY'
+        'EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY'
       ];
 
       let foundEnvFile = false;

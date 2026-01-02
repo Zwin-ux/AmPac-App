@@ -47,8 +47,6 @@ export const createEvent = async (event: Omit<Event, 'id' | 'attendees' | 'engag
             const userSnap = await getDoc(doc(db, 'users', user.uid));
             const userData = userSnap.exists() ? userSnap.data() as any : {};
             badges = userData.badges || [];
-        } else if (uid === 'dev-user') {
-            badges = ['Developer'];
         }
 
         const newEvent: any = {

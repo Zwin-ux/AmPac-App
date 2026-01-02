@@ -1,6 +1,5 @@
-import { API_URL } from '../config';
-import { getFirebaseIdToken } from './brainAuth';
-import { getApiHeaders } from './assistantService';
+// Calendar Service - Brain API removed for v1 launch
+// Calendar features will be available in a future update
 
 export interface TimeSlot {
     startTime: string;
@@ -20,42 +19,15 @@ export interface BookingResponse {
 }
 
 export const calendarService = {
-    getAvailableSlots: async (staffEmail: string, durationMinutes: number, start?: string, end?: string): Promise<AvailabilityPayload> => {
-        try {
-            const headers = await getApiHeaders();
-            const response = await fetch(`${API_URL}/calendar/available`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({ staffEmail, durationMinutes, start, end })
-            });
-            if (!response.ok) throw new Error('Failed to fetch slots');
-            const data = await response.json();
-            // Backward compatibility: API may return an array or an object with busy/suggested
-            if (Array.isArray(data)) {
-                return { busy: data as TimeSlot[], suggested: [], timeZone: 'UTC' };
-            }
-            return {
-                busy: (data?.busy as TimeSlot[]) || [],
-                suggested: data?.suggested || [],
-                timeZone: data?.timeZone || 'UTC'
-            };
-        } catch (error) {
-            console.error("Error fetching slots:", error);
-            return { busy: [], suggested: [], timeZone: 'UTC' };
-        }
+    getAvailableSlots: async (_staffEmail: string, _durationMinutes: number, _start?: string, _end?: string): Promise<AvailabilityPayload> => {
+        // Calendar integration coming soon - return empty availability
+        console.log('[Calendar] Calendar integration coming soon');
+        return { busy: [], suggested: [], timeZone: 'UTC' };
     },
 
-    bookMeeting: async (staffEmail: string, durationMinutes: number, chosenStartTime: string): Promise<BookingResponse> => {
-        const headers = await getApiHeaders();
-        const response = await fetch(`${API_URL}/calendar/book`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ staffEmail, durationMinutes, chosenStartTime })
-        });
-        if (!response.ok) {
-            const err = await response.json();
-            throw new Error(err.detail || 'Booking failed');
-        }
-        return await response.json();
+    bookMeeting: async (_staffEmail: string, _durationMinutes: number, _chosenStartTime: string): Promise<BookingResponse> => {
+        // Calendar integration coming soon
+        console.log('[Calendar] Meeting booking coming soon');
+        throw new Error('Calendar booking will be available in a future update');
     }
 };
