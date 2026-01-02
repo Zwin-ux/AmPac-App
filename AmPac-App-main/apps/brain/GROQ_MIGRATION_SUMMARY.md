@@ -33,7 +33,7 @@ Successfully migrated AmPac Brain Service from OpenAI/LangChain to Groq API for 
 - ✅ Better context-aware responses
 
 ### 6. Environment Configuration
-- ✅ Updated `.env` with provided Groq API key: `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`
+- ✅ Updated `.env` with provided Groq API key: `[REDACTED]`
 - ✅ Updated `.env.example` with Groq configuration template
 - ✅ Updated `.env.production.template` for production deployments
 
@@ -44,7 +44,7 @@ Successfully migrated AmPac Brain Service from OpenAI/LangChain to Groq API for 
 ## API Key Configuration
 The Groq API key has been configured in the environment:
 ```
-GROQ_API_KEY=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
+GROQ_API_KEY=[REDACTED]
 GROQ_MODEL=llama3-8b-8192
 ```
 

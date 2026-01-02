@@ -31,7 +31,7 @@ service_metrics = {
 
 # Simple configuration - independent from Brain Service
 API_KEY = os.getenv("SIMPLE_AI_API_KEY", "9dbUrc3VKS8Xr2Ho2Q4tZQ427-LuqT2cJcDMilKqw-Y")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "[REDACTED]")
 PORT = int(os.getenv("PORT", 8080))
 HOST = os.getenv("HOST", "0.0.0.0")
 

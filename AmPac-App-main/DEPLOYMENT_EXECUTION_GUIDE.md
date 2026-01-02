@@ -60,7 +60,7 @@ npx eas build --platform android --profile production
 ## 📊 SYSTEM STATUS OVERVIEW
 
 ### 🤖 AI Services - FULLY OPTIMIZED
-- **Groq API**: ✅ Active with key `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`
+- **Groq API**: ✅ Active with key `[REDACTED]`
 - **Brain Service**: ✅ Operational with intelligent fallbacks
 - **Simple AI Service**: ✅ Independent deployment ready
 - **Response Time**: ✅ Sub-10-second with timeout handling

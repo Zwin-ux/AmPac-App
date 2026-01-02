@@ -13,7 +13,7 @@ if (-not $env:SIMPLE_AI_API_KEY) {
 }
 
 if (-not $env:GROQ_API_KEY) {
-    $env:GROQ_API_KEY = "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"
+    $env:GROQ_API_KEY = "[REDACTED]"
 }
 
 if (-not $env:PORT) {
